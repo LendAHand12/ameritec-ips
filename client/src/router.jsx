@@ -1,0 +1,112 @@
+import { Navigate, createBrowserRouter } from 'react-router-dom'
+import RootLayout from '@/layouts/RootLayout'
+import AuthLayout from '@/layouts/AuthLayout'
+import UserLayout from '@/layouts/UserLayout'
+import GuestRoute from '@/components/routes/GuestRoute'
+import ProtectedRoute from '@/components/routes/ProtectedRoute'
+import LoginPage from '@/pages/auth/LoginPage'
+import RegisterPage from '@/pages/auth/register/RegisterPage'
+import VerifyEmailPage from '@/pages/auth/VerifyEmailPage'
+import ApplicationStatusPage from '@/pages/auth/ApplicationStatusPage'
+import ForgotPasswordPage from '@/pages/auth/ForgotPasswordPage'
+import DashboardPage from '@/pages/user/DashboardPage'
+import TradePage from '@/pages/trade/TradePage'
+import OrderPaymentPage from '@/pages/trade/OrderPaymentPage'
+import OrdersPage from '@/pages/trade/OrdersPage'
+import ReferralsPage from '@/pages/user/ReferralsPage'
+import GuidePage from '@/pages/user/GuidePage'
+import SupportPage from '@/pages/user/SupportPage'
+import AccountPage from '@/pages/user/AccountPage'
+import NotFoundPage from '@/pages/NotFoundPage'
+import AdminAuthProvider from '@/context/AdminAuthProvider'
+import AdminAuthLayout from '@/layouts/AdminAuthLayout'
+import AdminLayout from '@/layouts/AdminLayout'
+import AdminGuestRoute from '@/components/routes/AdminGuestRoute'
+import AdminProtectedRoute from '@/components/routes/AdminProtectedRoute'
+import AdminLoginPage from '@/pages/admin/AdminLoginPage'
+import AdminPlaceholderPage from '@/pages/admin/AdminPlaceholderPage'
+import AdminUsersPage from '@/pages/admin/AdminUsersPage'
+import AdminTransactionsPage from '@/pages/admin/AdminTransactionsPage'
+import AdminParametersPage from '@/pages/admin/AdminParametersPage'
+import AdminSupportPage from '@/pages/admin/AdminSupportPage'
+import AdminSupportTicketPage from '@/pages/admin/AdminSupportTicketPage'
+import AdminAuditLogsPage from '@/pages/admin/AdminAuditLogsPage'
+
+const router = createBrowserRouter([
+  {
+    element: <RootLayout />,
+    children: [
+      { path: '/', element: <Navigate to="/dashboard" replace /> },
+      {
+        element: <GuestRoute />,
+        children: [
+          {
+            element: <AuthLayout />,
+            children: [
+              { path: 'login', element: <LoginPage /> },
+              { path: 'register', element: <RegisterPage /> },
+              { path: 'verify-email', element: <VerifyEmailPage /> },
+              { path: 'application-status', element: <ApplicationStatusPage /> },
+              { path: 'account-pending', element: <Navigate to="/application-status" replace /> },
+              { path: 'forgot-password', element: <ForgotPasswordPage /> },
+            ],
+          },
+        ],
+      },
+      {
+        element: <ProtectedRoute />,
+        children: [
+          {
+            element: <UserLayout />,
+            children: [
+              { path: 'dashboard', element: <DashboardPage /> },
+              { path: 'trade', element: <TradePage /> },
+              { path: 'trade/orders', element: <OrdersPage /> },
+              { path: 'trade/orders/:id', element: <OrderPaymentPage /> },
+              { path: 'referrals', element: <ReferralsPage /> },
+              { path: 'guide', element: <GuidePage /> },
+              { path: 'support', element: <SupportPage /> },
+              { path: 'account', element: <AccountPage /> },
+            ],
+          },
+        ],
+      },
+      // Admin portal — separate login and session from customers
+      {
+        path: 'admin',
+        element: <AdminAuthProvider />,
+        children: [
+          {
+            element: <AdminGuestRoute />,
+            children: [{ element: <AdminAuthLayout />, children: [{ path: 'login', element: <AdminLoginPage /> }] }],
+          },
+          {
+            element: <AdminProtectedRoute />,
+            children: [
+              {
+                element: <AdminLayout />,
+                children: [
+                  { index: true, element: <AdminPlaceholderPage />, handle: { title: 'Overview' } },
+                  { path: 'users', element: <AdminUsersPage />, handle: { title: 'Users & KYC' } },
+                  { path: 'transactions', element: <AdminTransactionsPage />, handle: { title: 'Transactions' } },
+                  { path: 'parameters', element: <AdminParametersPage />, handle: { title: 'Operational Parameters' } },
+                  { path: 'support', element: <AdminSupportPage />, handle: { title: 'Support' } },
+                  { path: 'support/tickets/:id', element: <AdminSupportTicketPage />, handle: { title: 'Support' } },
+                  { path: 'audit-logs', element: <AdminAuditLogsPage />, handle: { title: 'Audit Logs' } },
+                  ...[
+                    ['shares', 'Shares'],
+                    ['referrals', 'Referral & Commission'],
+                    ['settings', 'Settings'],
+                  ].map(([path, title]) => ({ path, element: <AdminPlaceholderPage />, handle: { title } })),
+                ],
+              },
+            ],
+          },
+        ],
+      },
+      { path: '*', element: <NotFoundPage /> },
+    ],
+  },
+])
+
+export default router

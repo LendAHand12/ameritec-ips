@@ -1,0 +1,217 @@
+import path from 'path'
+import env from '../config/env.js'
+import Order, { ORDER_STATUS } from '../models/Order.js'
+import { getSettings } from '../models/Setting.js'
+import { getBalanceCents } from '../models/WalletTransaction.js'
+import ApiError from '../utils/ApiError.js'
+import { fromCents, toCents } from '../utils/money.js'
+import { checkBep20Order, nextOrderCode } from '../services/order.service.js'
+
+// Zelle is only offered to US (+1) phone numbers
+const canUseZelle = (user) => user.phone?.startsWith('+1')
+
+export const toOrderDto = (o) => ({
+  id: o.id,
+  orderCode: o.orderCode,
+  shareType: o.shareType,
+  price: fromCents(o.priceCents),
+  shares: o.shares,
+  amount: fromCents(o.amountCents),
+  status: o.status,
+  paymentMethod: o.paymentMethod ?? null,
+  txHash: o.txHash ?? null,
+  zelleReference: o.zelleReference ?? null,
+  paymentError: o.paymentError ?? null,
+  rejectionReason: o.rejectionReason ?? null,
+  hasCertificate: !!o.certificate?.filename,
+  createdAt: o.createdAt,
+  paidAt: o.paidAt ?? null,
+  completedAt: o.completedAt ?? null,
+})
+
+/** The minimum an order must cost: the first-purchase minimum until the user has a completed order. */
+async function minPurchaseFor(userId, settings) {
+  const firstPurchase = !(await Order.exists({ user: userId, status: ORDER_STATUS.COMPLETED }))
+  return { firstPurchase, minCents: settings.minPurchaseCents[firstPurchase ? 'first' : 'next'] }
+}
+
+async function findMyOrder(req) {
+  const order = await Order.findOne({ _id: req.params.id, user: req.user._id })
+  if (!order) throw new ApiError(404, 'Order not found')
+  return order
+}
+
+const sharesDto = (settings) =>
+  ['A', 'B'].map((type) => ({
+    type,
+    label: settings.shares[type].label,
+    description: settings.shares[type].description,
+    price: fromCents(settings.shares[type].priceCents),
+  }))
+
+/** Everything the Trade page needs: class prices, payment methods for this user, wallet balance. */
+export async function getTradeConfig(req, res) {
+  const settings = await getSettings()
+  const { bep20, zelle } = settings.payment
+  const { firstPurchase, minCents } = await minPurchaseFor(req.user._id, settings)
+  res.json({
+    shares: sharesDto(settings),
+    minPurchase: { amount: fromCents(minCents), firstPurchase },
+    paymentMethods: {
+      bep20: bep20.enabled && bep20.address ? { network: 'BNB Smart Chain (BEP20)', token: 'USDT', address: bep20.address } : null,
+      zelle:
+        zelle.enabled && zelle.recipient && canUseZelle(req.user)
+          ? { recipientName: zelle.recipientName, recipient: zelle.recipient, hasQr: !!zelle.qrImage }
+          : null,
+    },
+    balance: fromCents(await getBalanceCents(req.user._id)),
+  })
+}
+
+/** Holdings + recent orders for the dashboard. */
+export async function getPortfolio(req, res) {
+  const [settings, completed, recent, balanceCents] = await Promise.all([
+    getSettings(),
+    Order.find({ user: req.user._id, status: ORDER_STATUS.COMPLETED }).sort({ completedAt: 1 }),
+    Order.find({ user: req.user._id }).sort({ createdAt: -1 }).limit(5),
+    getBalanceCents(req.user._id),
+  ])
+
+  const holdings = Object.fromEntries(['A', 'B'].map((t) => [t, { shares: 0, investedCents: 0 }]))
+  for (const o of completed) {
+    holdings[o.shareType].shares += o.shares
+    holdings[o.shareType].investedCents += o.amountCents
+  }
+  const valueCents = (type) => holdings[type].shares * settings.shares[type].priceCents
+
+  res.json({
+    balance: fromCents(balanceCents),
+    shares: sharesDto(settings).map((s) => ({
+      ...s,
+      quantity: holdings[s.type].shares,
+      value: fromCents(valueCents(s.type)),
+      invested: fromCents(holdings[s.type].investedCents),
+    })),
+    totalShares: holdings.A.shares + holdings.B.shares,
+    totalValue: fromCents(valueCents('A') + valueCents('B')),
+    totalInvested: fromCents(holdings.A.investedCents + holdings.B.investedCents),
+    // Holdings over time (valued at the current price) for the performance chart
+    history: completed.map((o) => ({ date: o.completedAt, shareType: o.shareType, shares: o.shares })),
+    recentOrders: recent.map(toOrderDto),
+  })
+}
+
+export async function createOrder(req, res) {
+  const { shareType, amount } = req.body
+  const settings = await getSettings()
+  const priceCents = settings.shares[shareType].priceCents
+  if (!priceCents) throw new ApiError(400, 'This class is not available right now')
+
+  // Whole shares only; the user pays exactly shares × price
+  const shares = Math.floor(toCents(amount) / priceCents)
+  if (shares < 1) {
+    throw new ApiError(400, `Minimum purchase is 1 share (${fromCents(priceCents).toFixed(2)} USDT)`, { amount: 'Amount is below the price of one share' })
+  }
+  const { firstPurchase, minCents } = await minPurchaseFor(req.user._id, settings)
+  if (shares * priceCents < minCents) {
+    const msg = `Minimum ${firstPurchase ? 'first purchase' : 'purchase'} is ${fromCents(minCents).toFixed(2)} USDT`
+    throw new ApiError(400, msg, { amount: msg })
+  }
+
+  const order = await Order.create({
+    orderCode: await nextOrderCode(),
+    user: req.user._id,
+    shareType,
+    priceCents,
+    shares,
+    amountCents: shares * priceCents,
+  })
+  res.status(201).json({ order: toOrderDto(order) })
+}
+
+export async function listMyOrders(req, res) {
+  const { page, limit } = req.validatedQuery
+  const filter = { user: req.user._id }
+  const [items, total] = await Promise.all([
+    Order.find(filter).sort({ createdAt: -1 }).skip((page - 1) * limit).limit(limit),
+    Order.countDocuments(filter),
+  ])
+  res.json({ data: items.map(toOrderDto), pagination: { page, limit, total, totalPages: Math.ceil(total / limit) } })
+}
+
+export async function getMyOrder(req, res) {
+  res.json({ order: toOrderDto(await findMyOrder(req)) })
+}
+
+export async function submitPayment(req, res) {
+  const order = await findMyOrder(req)
+  // A BEP20 payment the system couldn't verify can be resubmitted with the correct tx hash
+  const retryBep20 = order.status === ORDER_STATUS.PENDING_REVIEW && order.paymentMethod === 'bep20'
+  if (order.status !== ORDER_STATUS.AWAITING_PAYMENT && !retryBep20) {
+    throw new ApiError(409, 'Payment for this order has already been submitted', undefined, 'ORDER_NOT_PAYABLE')
+  }
+
+  const settings = await getSettings()
+  const { method } = req.body
+
+  if (method === 'bep20') {
+    if (!settings.payment.bep20.enabled || !settings.payment.bep20.address) throw new ApiError(400, 'USDT payment is not available')
+    if (await Order.exists({ txHash: req.body.txHash, _id: { $ne: order._id } })) {
+      throw new ApiError(409, 'This transaction has already been used for another order', { txHash: 'Transaction already used' }, 'TX_ALREADY_USED')
+    }
+    order.paymentMethod = 'bep20'
+    order.txHash = req.body.txHash
+    order.status = ORDER_STATUS.VERIFYING
+    order.paymentError = undefined
+    order.paidAt = new Date()
+    await order.save()
+
+    try {
+      await checkBep20Order(order)
+    } catch (err) {
+      // RPC hiccup: the background watcher will retry
+      console.error(`BEP20 check failed for ${order.orderCode}:`, err.message)
+    }
+  } else {
+    if (!settings.payment.zelle.enabled || !canUseZelle(req.user)) throw new ApiError(400, 'Zelle is not available for your account')
+    order.paymentMethod = 'zelle'
+    order.zelleReference = req.body.reference
+    order.status = ORDER_STATUS.PENDING_REVIEW
+    order.paidAt = new Date()
+    await order.save()
+  }
+
+  res.json({ order: toOrderDto(await Order.findById(order._id)) })
+}
+
+/** Lets the client poll a VERIFYING order (also re-runs the on-chain check). */
+export async function refreshPayment(req, res) {
+  const order = await findMyOrder(req)
+  if (order.status === ORDER_STATUS.VERIFYING) {
+    await checkBep20Order(order).catch((err) => console.error(`BEP20 check failed for ${order.orderCode}:`, err.message))
+  }
+  res.json({ order: toOrderDto(await Order.findById(order._id)) })
+}
+
+export async function cancelOrder(req, res) {
+  const order = await Order.findOneAndUpdate(
+    { _id: req.params.id, user: req.user._id, status: ORDER_STATUS.AWAITING_PAYMENT },
+    { status: ORDER_STATUS.CANCELLED },
+    { new: true },
+  )
+  if (!order) throw new ApiError(409, 'Only unpaid orders can be cancelled')
+  res.json({ order: toOrderDto(order) })
+}
+
+export async function downloadCertificate(req, res) {
+  const order = await findMyOrder(req)
+  if (!order.certificate?.filename) throw new ApiError(404, 'Certificate not available yet')
+  res.download(path.resolve(env.certificates.dir, path.basename(order.certificate.filename)), `${order.orderCode}-certificate${path.extname(order.certificate.filename)}`)
+}
+
+export async function getZelleQr(req, res) {
+  const { payment } = await getSettings()
+  if (!payment.zelle.enabled || !payment.zelle.qrImage || !canUseZelle(req.user)) throw new ApiError(404, 'Not found')
+  res.set('Cache-Control', 'private, max-age=300')
+  res.sendFile(path.basename(payment.zelle.qrImage), { root: path.resolve(env.settingsDir) })
+}
