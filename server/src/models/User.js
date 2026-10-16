@@ -4,6 +4,7 @@ import { generateReferralCode } from '../utils/referralCode.js'
 
 export const DOCUMENT_TYPES = ['national_id', 'passport', 'drivers_license']
 export const USER_STATUS = { PENDING: 'pending', APPROVED: 'approved', REJECTED: 'rejected' }
+export const FACE_STATUS = { NONE: 'none', PENDING: 'pending', APPROVED: 'approved', REJECTED: 'rejected' }
 export const ACCOUNT_STATUS = { ACTIVE: 'active', LOCKED: 'locked' }
 
 const emailVerificationSchema = new mongoose.Schema(
@@ -33,7 +34,16 @@ const userSchema = new mongoose.Schema(
       backImage: String,
       supportingImage: String,
     },
+    // True only once an admin approved the face scan (it is optional at sign-up and can be added later)
     faceVerified: { type: Boolean, default: false },
+    face: {
+      status: { type: String, enum: Object.values(FACE_STATUS), default: FACE_STATUS.NONE },
+      image: String, // file in storage/kyc, never served statically
+      submittedAt: Date,
+      reviewedAt: Date,
+      reviewedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'Admin' },
+      rejectionReason: String,
+    },
     termsAcceptedAt: Date,
 
     twoFactor: {
@@ -57,6 +67,19 @@ const userSchema = new mongoose.Schema(
     lockedReason: String,
     reviewedAt: Date,
     reviewedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'Admin' },
+
+    // Soft delete: the row stays for history, but its email / phone are freed for new accounts
+    deletedAt: { type: Date, default: null, index: true },
+    deletedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'Admin' },
+    deletedSnapshot: { email: String, phone: String, applicationId: String, referralCode: String, reason: String },
+
+    // Where commission withdrawals are paid (USDT, BNB Smart Chain). Changing it needs an authenticator code.
+    withdrawalWallet: { address: String, updatedAt: Date },
+
+    passwordReset: { type: emailVerificationSchema, select: false },
+    passwordChangedAt: Date,
+    // "Sign out of other devices": sessions issued before this are no longer valid
+    sessionsRevokedAt: Date,
   },
   {
     timestamps: true,
@@ -64,6 +87,7 @@ const userSchema = new mongoose.Schema(
       transform(doc, ret) {
         delete ret.password
         delete ret.emailVerification
+        if (ret.face) delete ret.face.image
         delete ret.__v
         if (ret.twoFactor) {
           delete ret.twoFactor.secret

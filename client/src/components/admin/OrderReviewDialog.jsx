@@ -5,12 +5,13 @@ import { Button, buttonVariants } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Spinner } from '@/components/ui/spinner'
 import { Textarea } from '@/components/ui/textarea'
+import { useAdminAuth } from '@/hooks/useAdminAuth'
 import StatusBadge from '@/components/dashboard/StatusBadge'
 import { formatDate, formatInt, formatUsdt } from '@/lib/format'
 import { ORDER_STATUS, PAYMENT_METHOD_LABEL, bscscanTxUrl } from '@/lib/orders'
 import * as adminService from '@/services/admin.service'
 
-const OPEN = ['awaiting_payment', 'verifying', 'pending_review']
+const OPEN = ['awaiting_payment', 'paying', 'verifying', 'pending_review']
 
 function Row({ label, children }) {
   return (
@@ -23,6 +24,8 @@ function Row({ label, children }) {
 
 /** Review a share purchase: approve / reject payment, upload the share certificate. */
 export default function OrderReviewDialog({ orderId, onClose, onChanged }) {
+  const { can } = useAdminAuth()
+  const canManage = can('orders:manage')
   const [order, setOrder] = useState(null)
   const [busy, setBusy] = useState(null)
   const [rejecting, setRejecting] = useState(false)
@@ -123,6 +126,14 @@ export default function OrderReviewDialog({ orderId, onClose, onChanged }) {
                 )}
                 {order.paidAt && <Row label="Submitted">{formatDate(order.paidAt)}</Row>}
                 {order.paymentError && <Row label="Verification">{order.paymentError}</Row>}
+                {order.chainCheck && order.chainCheck.state !== 'verified' && (
+                  <Row label="On-chain check">
+                    <span className={order.chainCheck.state === 'invalid' ? 'font-semibold text-destructive' : 'text-warning'}>
+                      {order.chainCheck.state === 'invalid' ? `Not verified — ${order.chainCheck.reason ?? 'transfer not found'}` : 'Still checking…'}
+                    </span>
+                  </Row>
+                )}
+                {order.chainCheck?.state === 'verified' && <Row label="On-chain check">Verified</Row>}
                 {order.completedAt && (
                   <Row label="Completed">
                     {formatDate(order.completedAt)} · {order.completedBy === 'system' ? 'verified on-chain' : 'approved by admin'}
@@ -145,11 +156,15 @@ export default function OrderReviewDialog({ orderId, onClose, onChanged }) {
                     View
                   </a>
                 )}
+{canManage && (
+                <>
                 <input ref={fileRef} type="file" accept="application/pdf,image/jpeg,image/png,image/webp" className="sr-only" onChange={onFile} />
                 <Button onClick={() => fileRef.current?.click()} disabled={!!busy}>
                   {busy === 'upload' ? <Spinner /> : <FileUpIcon />}
                   {order.certificate ? 'Replace' : 'Upload certificate'}
                 </Button>
+                </>
+)}
               </section>
             )}
 
@@ -162,7 +177,7 @@ export default function OrderReviewDialog({ orderId, onClose, onChanged }) {
               </div>
             )}
 
-            {open && (
+            {open && canManage && (
               <div className="flex flex-col-reverse gap-2 border-t pt-4 sm:flex-row sm:justify-end">
                 {rejecting ? (
                   <>

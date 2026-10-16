@@ -4,6 +4,7 @@ import adminRoutes from './admin.routes.js'
 import tradeRoutes from './trade.routes.js'
 import referralRoutes from './referral.routes.js'
 import supportRoutes from './support.routes.js'
+import accountRoutes from './account.routes.js'
 
 const router = Router()
 
@@ -13,5 +14,6 @@ router.use('/admin', adminRoutes)
 router.use('/trade', tradeRoutes)
 router.use('/referrals', referralRoutes)
 router.use('/support', supportRoutes)
+router.use('/account', accountRoutes)
 
 export default router

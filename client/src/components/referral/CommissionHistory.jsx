@@ -113,7 +113,14 @@ export default function CommissionHistory() {
                   </span>
                 </td>
                 <td className={td}>{c.ratePct}%</td>
-                <td className={`${td} font-semibold text-foreground tabular-nums`}>{formatUsdt(c.amount)} USDT</td>
+                <td className={`${td} font-semibold text-foreground tabular-nums`}>
+                  {formatUsdt(c.amount)} USDT
+                  {c.status === 'pending' && (
+                    <span className="ml-2 rounded-full bg-warning-soft px-2 py-0.5 text-caption font-semibold text-warning" title={c.pendingReason === 'buyer_face' ? `Released once ${c.member}’s face scan is approved` : `Released once ${c.member} completes KYC`}>
+                      Pending
+                    </span>
+                  )}
+                </td>
                 <td className={td}>
                   {formatInt(c.shares)} Class {c.shareType}
                 </td>

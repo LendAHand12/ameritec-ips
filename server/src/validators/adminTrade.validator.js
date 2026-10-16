@@ -20,6 +20,7 @@ const shareConfig = z.object({
   label: z.string().trim().min(1).max(50),
   description: z.string().trim().max(100),
   price,
+  allocation: z.coerce.number().int('Enter a whole number').min(0, 'Enter 0 or more').max(1_000_000_000_000),
   commissionPct: z.coerce.number().min(0, 'Commission must be 0–100%').max(100, 'Commission must be 0–100%'),
 })
 

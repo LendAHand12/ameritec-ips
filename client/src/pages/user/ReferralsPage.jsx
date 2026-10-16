@@ -1,5 +1,6 @@
 import { Spinner } from '@/components/ui/spinner'
 import PageHeader from '@/components/PageHeader'
+import CommissionWallet from '@/components/referral/CommissionWallet'
 import CommissionHistory from '@/components/referral/CommissionHistory'
 import CommissionMechanism from '@/components/referral/CommissionMechanism'
 import CommissionPerformance from '@/components/referral/CommissionPerformance'
@@ -7,11 +8,13 @@ import NetworkOverview from '@/components/referral/NetworkOverview'
 import ReferralKpis from '@/components/referral/ReferralKpis'
 import ReferralLinkCard from '@/components/referral/ReferralLinkCard'
 import ReferralNetwork from '@/components/referral/ReferralNetwork'
+import { useState } from 'react'
 import { useAsync } from '@/hooks/useAsync'
 import { getReferralNetwork, getReferralSummary } from '@/services/referral.service'
 
 export default function ReferralsPage() {
-  const { data: summary, error } = useAsync(getReferralSummary, [])
+  const [reloadKey, setReloadKey] = useState(0)
+  const { data: summary, error } = useAsync(getReferralSummary, [reloadKey])
   const { data: network } = useAsync(getReferralNetwork, [])
 
   return (
@@ -32,6 +35,7 @@ export default function ReferralsPage() {
       {summary && (
         <div className="flex flex-col gap-[17.5px]">
           <ReferralLinkCard code={summary.referralCode} />
+          <CommissionWallet onChanged={() => setReloadKey((k) => k + 1)} />
           <ReferralKpis summary={summary} />
           <NetworkOverview network={summary.network} />
           {network ? (

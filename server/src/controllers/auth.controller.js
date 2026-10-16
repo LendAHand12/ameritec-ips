@@ -1,7 +1,7 @@
 import jwt from 'jsonwebtoken'
 import bcrypt from 'bcryptjs'
 import env from '../config/env.js'
-import User, { ACCOUNT_STATUS, USER_STATUS } from '../models/User.js'
+import User, { ACCOUNT_STATUS, FACE_STATUS, USER_STATUS } from '../models/User.js'
 import ApiError from '../utils/ApiError.js'
 import { normalizePhone } from '../utils/normalize.js'
 import { applicationSummary, nextApplicationId } from '../utils/applicationId.js'
@@ -9,6 +9,7 @@ import { TOKEN_PURPOSE, signToken, verifyToken } from '../utils/tokens.js'
 import { SESSION_COOKIE } from '../middlewares/auth.js'
 import { generateTwoFactorSecret, verifyTwoFactorCode } from '../services/twoFactor.service.js'
 import { confirmVerificationCode, issueVerificationCode } from '../services/emailVerification.service.js'
+import { RESEND_COOLDOWN_SECONDS, issuePasswordResetCode, resetPasswordWithCode } from '../services/passwordReset.service.js'
 
 // Compared against when the account doesn't exist so response time doesn't reveal it
 const DUMMY_HASH = bcrypt.hashSync('dummy-password', 12)
@@ -23,7 +24,7 @@ async function assertAccountInfoAvailable({ email, phoneCountry, phoneNumber, re
   const [emailTaken, phoneTaken, referrer] = await Promise.all([
     User.exists({ email }),
     phone ? User.exists({ phone }) : null,
-    referralCode ? User.findOne({ referralCode }).select('_id fullName') : null,
+    referralCode ? User.findOne({ referralCode, deletedAt: null }).select('_id fullName') : null,
   ])
 
   if (emailTaken) details.email = 'Email is already registered'
@@ -88,6 +89,7 @@ export async function register(req, res) {
   const front = req.files?.documentFront?.[0]
   const back = req.files?.documentBack?.[0]
   const supporting = req.files?.supportingDocument?.[0]
+  const face = req.files?.face?.[0]
   if (!front || !back) {
     const details = {}
     if (!front) details.documentFront = 'Front image is required'
@@ -95,12 +97,16 @@ export async function register(req, res) {
     throw new ApiError(400, Object.values(details)[0], details, 'VALIDATION_ERROR')
   }
 
-  const twoFactor = verifyToken(data.twoFactorToken, TOKEN_PURPOSE.TWO_FACTOR_VERIFIED, {
-    code: 'TWO_FACTOR_SETUP_EXPIRED',
-    message: 'Two-factor setup expired, please set it up again',
-  })
-  if (twoFactor.email !== data.email) {
-    throw new ApiError(400, 'Two-factor setup does not match this email, please set it up again', undefined, 'TWO_FACTOR_SETUP_EXPIRED')
+  // Two-factor is optional: only enabled when the person finished the setup step
+  let twoFactor = null
+  if (data.twoFactorToken) {
+    twoFactor = verifyToken(data.twoFactorToken, TOKEN_PURPOSE.TWO_FACTOR_VERIFIED, {
+      code: 'TWO_FACTOR_SETUP_EXPIRED',
+      message: 'Two-factor setup expired, please set it up again',
+    })
+    if (twoFactor.email !== data.email) {
+      throw new ApiError(400, 'Two-factor setup does not match this email, please set it up again', undefined, 'TWO_FACTOR_SETUP_EXPIRED')
+    }
   }
 
   const { phone, referrer } = await assertAccountInfoAvailable(data)
@@ -118,7 +124,9 @@ export async function register(req, res) {
       backImage: back.filename,
       supportingImage: supporting?.filename,
     },
-    twoFactor: { enabled: true, secret: twoFactor.secret },
+    twoFactor: twoFactor ? { enabled: true, secret: twoFactor.secret } : { enabled: false },
+    // An optional face scan waits for an admin to approve it
+    face: face ? { status: FACE_STATUS.PENDING, image: face.filename, submittedAt: new Date() } : { status: FACE_STATUS.NONE },
     termsAcceptedAt: new Date(),
     applicationId: await nextApplicationId(),
   })
@@ -156,6 +164,22 @@ export async function resendVerification(req, res) {
 
   const result = await issueVerificationCode(user)
   res.json(result)
+}
+
+// ---- Password reset ----
+
+export async function forgotPassword(req, res) {
+  const user = await User.findOne({ email: req.body.email, deletedAt: null }).select('+passwordReset')
+  await issuePasswordResetCode(user)
+  // Same answer whether or not the account exists
+  res.json({ resendAfter: RESEND_COOLDOWN_SECONDS })
+}
+
+export async function resetPassword(req, res) {
+  const { email, code, password } = req.body
+  const user = await User.findOne({ email, deletedAt: null }).select('+passwordReset +password')
+  await resetPasswordWithCode(user, code, password)
+  res.json({ message: 'Password updated' })
 }
 
 // ---- Login ----

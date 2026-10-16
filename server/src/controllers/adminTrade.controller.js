@@ -18,6 +18,7 @@ const settingsSnapshot = (s) => ({
     ['A', 'B'].flatMap((t) => [
       [`Class ${t} price (USDT)`, fromCents(s.shares[t].priceCents)],
       [`Class ${t} F1 commission (%)`, s.commissionPct[t]],
+      [`Class ${t} shares available`, s.allocation[t]],
       [`Class ${t} name`, s.shares[t].label],
       [`Class ${t} description`, s.shares[t].description],
     ]),
@@ -38,6 +39,8 @@ const toAdminOrderDto = (o) => ({
   ...toOrderDto(o),
   user: o.user && { id: o.user.id, fullName: o.user.fullName, email: o.user.email, phone: o.user.phone, referralCode: o.user.referralCode },
   completedBy: o.completedBy ?? null,
+  // Background on-chain audit of an instantly-completed wallet payment
+  chainCheck: o.chainCheck?.state ? { state: o.chainCheck.state, reason: o.chainCheck.reason ?? null } : null,
   certificate: o.certificate?.filename ? { originalName: o.certificate.originalName, uploadedAt: o.certificate.uploadedAt } : null,
 })
 
@@ -103,7 +106,7 @@ export async function approveOrder(req, res) {
 export async function rejectOrder(req, res) {
   describeAudit(req, { record: { type: 'order', id: req.params.id }, description: `Rejected: ${req.body.reason}` })
   const order = await Order.findOneAndUpdate(
-    { _id: req.params.id, status: { $in: [ORDER_STATUS.AWAITING_PAYMENT, ORDER_STATUS.VERIFYING, ORDER_STATUS.PENDING_REVIEW] } },
+    { _id: req.params.id, status: { $in: [ORDER_STATUS.AWAITING_PAYMENT, ORDER_STATUS.PAYING, ORDER_STATUS.VERIFYING, ORDER_STATUS.PENDING_REVIEW] } },
     { status: ORDER_STATUS.REJECTED, rejectionReason: req.body.reason, reviewedBy: req.admin._id },
     { new: true },
   )
@@ -146,7 +149,7 @@ const settingsDto = (s) => ({
   shares: Object.fromEntries(
     ['A', 'B'].map((t) => [
       t,
-      { label: s.shares[t].label, description: s.shares[t].description, price: fromCents(s.shares[t].priceCents), commissionPct: s.commissionPct[t] },
+      { label: s.shares[t].label, description: s.shares[t].description, price: fromCents(s.shares[t].priceCents), commissionPct: s.commissionPct[t], allocation: s.allocation[t] },
     ]),
   ),
   minPurchase: { first: fromCents(s.minPurchaseCents.first), next: fromCents(s.minPurchaseCents.next) },
@@ -182,6 +185,7 @@ export async function updateSettings(req, res) {
     settings.shares[t].description = shares[t].description
     settings.shares[t].priceCents = toCents(shares[t].price)
     settings.commissionPct[t] = shares[t].commissionPct
+    settings.allocation[t] = shares[t].allocation
   }
   settings.minPurchaseCents.first = toCents(minPurchase.first)
   settings.minPurchaseCents.next = toCents(minPurchase.next)

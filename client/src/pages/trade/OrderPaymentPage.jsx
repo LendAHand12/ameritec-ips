@@ -1,6 +1,5 @@
-import { useCallback, useEffect, useState } from 'react'
-import { Link, useParams } from 'react-router-dom'
-import QRCode from 'qrcode'
+import { Suspense, lazy, useCallback, useEffect, useRef, useState } from 'react'
+import { Link, useParams, useSearchParams } from 'react-router-dom'
 import {
   AlertTriangleIcon,
   CheckCircle2Icon,
@@ -24,7 +23,11 @@ import StatusBadge from '@/components/dashboard/StatusBadge'
 import { formatDate, formatInt, formatUsdt } from '@/lib/format'
 import { ORDER_STATUS, PAYMENT_METHOD_LABEL, bscscanTxUrl } from '@/lib/orders'
 import { cn } from '@/lib/utils'
+import { walletConfigured } from '@/lib/wallet-config'
 import * as trade from '@/services/trade.service'
+
+// The wallet libraries are heavy: only load them on this page, and only when a project ID is set
+const WalletPayment = lazy(() => import('@/components/trade/WalletPayment'))
 
 const POLL_MS = 10_000
 
@@ -53,80 +56,34 @@ function CopyField({ label, value, mono }) {
   )
 }
 
-function Bep20Payment({ order, method, onSubmitted }) {
-  const [qr, setQr] = useState('')
-  const [txHash, setTxHash] = useState(order.txHash ?? '')
-  const [error, setError] = useState('')
-  const [submitting, setSubmitting] = useState(false)
-
+function UsdtPayment({ order, method, onStarted, onSubmitted }) {
+  // Picking USDT moves the order to "paying" (once), then the wallet list opens
+  const started = useRef(false)
   useEffect(() => {
-    QRCode.toDataURL(method.address, { width: 240, margin: 1 }).then(setQr)
-  }, [method.address])
+    if (order.status !== 'awaiting_payment' || started.current) return
+    started.current = true
+    trade
+      .startPayment(order.id)
+      .then(({ order: updated }) => onStarted(updated))
+      .catch((err) => toast.error(err.message))
+  }, [order.id, order.status, onStarted])
 
-  const submit = async (e) => {
-    e.preventDefault()
-    setSubmitting(true)
-    setError('')
-    try {
-      const { order: updated } = await trade.submitPayment(order.id, { method: 'bep20', txHash: txHash.trim() })
-      onSubmitted(updated)
-    } catch (err) {
-      setError(err.details?.txHash ?? err.message)
-    } finally {
-      setSubmitting(false)
-    }
+  if (!walletConfigured) {
+    return <p className="rounded-lg bg-muted p-4 text-caption text-muted-foreground">Wallet payments are not set up yet. Please contact support.</p>
   }
 
   return (
     <div className="space-y-5">
-      <div className="flex flex-col gap-5 sm:flex-row">
-        {qr && <img src={qr} alt="Payment address QR code" className="size-[150px] shrink-0 self-center rounded-lg border p-1.5" />}
-        <div className="min-w-0 flex-1 space-y-4">
-          <CopyField label="Amount to send" value={`${formatUsdt(order.amount)}`} />
-          <CopyField label="USDT deposit address" value={method.address} mono />
-          <p className="text-caption text-muted-foreground">
-            Network <span className="font-bold text-foreground">{method.network}</span> · Token{' '}
-            <span className="font-bold text-foreground">{method.token}</span>
-          </p>
-        </div>
-      </div>
-
+      <Suspense fallback={<Spinner className="mx-auto size-5 text-muted-foreground" />}>
+        <WalletPayment order={order} method={method} onSubmitted={onSubmitted} autoOpen />
+      </Suspense>
       <div className="flex items-start gap-[11.25px] rounded-lg bg-warning-soft p-[13.75px] text-caption text-[#75521d]">
         <AlertTriangleIcon className="size-[21.25px] shrink-0 text-warning" />
         <div className="space-y-1">
-          <p className="font-bold">Verify the network before sending</p>
-          <p>
-            Only send USDT on BNB Smart Chain (BEP20). Sending other tokens or using another network may result in loss of funds. Send the
-            full amount in a single transfer.
-          </p>
+          <p className="font-bold">Pay on BNB Smart Chain (BEP20)</p>
+          <p>Your wallet will be set to BNB Smart Chain and send exactly {formatUsdt(order.amount)} USDT in a single transfer. Keep a little BNB for the network fee.</p>
         </div>
       </div>
-
-      <form onSubmit={submit} className="space-y-2.5">
-        <label htmlFor="txHash" className="text-caption font-semibold">
-          Transaction hash (TxID)
-        </label>
-        <Input
-          id="txHash"
-          size="lg"
-          value={txHash}
-          onChange={(e) => {
-            setTxHash(e.target.value)
-            setError('')
-          }}
-          placeholder="0x…"
-          autoComplete="off"
-          spellCheck={false}
-          className="font-mono text-sm"
-          aria-invalid={!!error}
-        />
-        {error && <p className="text-sm text-destructive">{error}</p>}
-        <p className="text-caption text-muted-foreground">After sending, paste the transaction hash from your wallet. We verify it on-chain automatically.</p>
-        <Button type="submit" size="xl" className="w-full" disabled={submitting || !txHash.trim()}>
-          {submitting && <Spinner className="size-5" />}
-          I’ve paid — verify my payment
-        </Button>
-      </form>
     </div>
   )
 }
@@ -189,6 +146,12 @@ function ZellePayment({ order, method, onSubmitted }) {
 
 function StatusPanel({ order }) {
   const map = {
+    paying: {
+      icon: <WalletIcon className="size-6" />,
+      tone: 'bg-warning-soft text-warning',
+      title: 'Paying with your wallet',
+      text: 'Pick your wallet, connect it and confirm the transfer. Your purchase completes as soon as the payment is sent.',
+    },
     verifying: {
       icon: <Spinner className="size-6" />,
       tone: 'bg-warning-soft text-warning',
@@ -201,7 +164,7 @@ function StatusPanel({ order }) {
       title: 'Payment submitted — waiting for review',
       text:
         order.paymentMethod === 'bep20' && order.paymentError
-          ? `We couldn’t verify this transaction automatically: ${order.paymentError}. Our team will review it, or you can submit the correct transaction hash below.`
+          ? `We couldn’t verify this transaction automatically: ${order.paymentError}. Our team will review it shortly.`
           : 'Our team will confirm your payment shortly. We’ll update this order once it’s approved.',
     },
     completed: {
@@ -246,6 +209,8 @@ function StatusPanel({ order }) {
 
 export default function OrderPaymentPage() {
   const { id } = useParams()
+  const [searchParams] = useSearchParams()
+  const preferredMethod = searchParams.get('method')
   const [order, setOrder] = useState(null)
   const [config, setConfig] = useState(null)
   const [error, setError] = useState(null)
@@ -255,13 +220,15 @@ export default function OrderPaymentPage() {
   const load = useCallback(async () => {
     try {
       const [{ order }, cfg] = await Promise.all([trade.getOrder(id), trade.getTradeConfig()])
-      setOrder(order)
+      // A slower, duplicate load must never overwrite a newer state (e.g. the order just moved to "paying")
+      setOrder((prev) => prev ?? order)
       setConfig(cfg)
-      setMethod((m) => m ?? order.paymentMethod ?? (cfg.paymentMethods.bep20 ? 'bep20' : cfg.paymentMethods.zelle ? 'zelle' : null))
+      const preferred = cfg.paymentMethods[preferredMethod] ? preferredMethod : null
+      setMethod((m) => m ?? order.paymentMethod ?? preferred ?? (cfg.paymentMethods.bep20 ? 'bep20' : cfg.paymentMethods.zelle ? 'zelle' : null))
     } catch (err) {
       setError(err)
     }
-  }, [id])
+  }, [id, preferredMethod])
 
   useEffect(() => {
     load()
@@ -315,19 +282,18 @@ export default function OrderPaymentPage() {
   }
 
   const status = ORDER_STATUS[order.status]
-  const canPay = order.status === 'awaiting_payment' || (order.status === 'pending_review' && order.paymentMethod === 'bep20')
+  const canPay = order.status === 'awaiting_payment' || order.status === 'paying'
   const methods = [
     config.paymentMethods.bep20 && { value: 'bep20', label: 'USDT (BEP20)' },
     config.paymentMethods.zelle && { value: 'zelle', label: 'Zelle' },
   ].filter(Boolean)
-  // A BEP20 retry stays on BEP20
-  const methodOptions = order.status === 'pending_review' ? methods.filter((m) => m.value === 'bep20') : methods
+  const methodOptions = methods
 
   return (
     <>
       <PageHeader
         breadcrumb={['Investor Portal', 'Trade', order.orderCode]}
-        title={canPay && order.status === 'awaiting_payment' ? 'Complete your payment' : 'Order details'}
+        title={canPay ? 'Complete your payment' : 'Order details'}
         description={`Order ${order.orderCode} · created ${formatDate(order.createdAt)}`}
         action={<StatusBadge tone={status.tone} icon={order.status === 'completed'}>{status.label}</StatusBadge>}
       />
@@ -349,15 +315,15 @@ export default function OrderPaymentPage() {
               />
               {!methodOptions.length && <p className="text-caption text-muted-foreground">Payments are not available right now. Please contact support.</p>}
               {method === 'bep20' && config.paymentMethods.bep20 && (
-                <Bep20Payment order={order} method={config.paymentMethods.bep20} onSubmitted={handleSubmitted} />
+                <UsdtPayment order={order} method={config.paymentMethods.bep20} onStarted={setOrder} onSubmitted={handleSubmitted} />
               )}
-              {method === 'zelle' && config.paymentMethods.zelle && order.status === 'awaiting_payment' && (
+              {method === 'zelle' && config.paymentMethods.zelle && (
                 <ZellePayment order={order} method={config.paymentMethods.zelle} onSubmitted={handleSubmitted} />
               )}
             </div>
           )}
 
-          {order.status === 'awaiting_payment' && (
+          {canPay && (
             <div className="border-t border-divider pt-4 text-center">
               <Button variant="ghost" className="text-muted-foreground" onClick={handleCancel} disabled={cancelling}>
                 {cancelling && <Spinner />}

@@ -8,3 +8,4 @@ server/uploads/*
 server/storage/**/*
 !server/storage/*/
 !server/storage/*/.gitkeep
+package-lock.json

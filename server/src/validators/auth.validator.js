@@ -58,7 +58,8 @@ export const registerSchema = accountInfoSchema.and(
     documentType: z.enum(DOCUMENT_TYPES, { error: 'Invalid document type' }),
     // multipart sends booleans as strings
     acceptTerms: z.literal('true', { error: 'Please accept the Terms of Service and Privacy Policy' }),
-    twoFactorToken: z.string({ error: 'Two-factor authentication is not set up' }).min(1),
+    // Optional: two-factor can be switched on later from Account & Security
+    twoFactorToken: z.string().optional(),
   }),
 )
 
@@ -70,6 +71,17 @@ export const twoFactorVerifySetupSchema = z.object({
 })
 
 export const verifyEmailSchema = z.object({ email: emailSchema, code: otpSchema })
+
+export const forgotPasswordSchema = z.object({ email: emailSchema })
+
+export const resetPasswordSchema = z
+  .object({
+    email: emailSchema,
+    code: otpSchema,
+    password: passwordSchema,
+    confirmPassword: z.string({ error: 'Please confirm your password' }),
+  })
+  .refine((d) => d.password === d.confirmPassword, { path: ['confirmPassword'], message: 'Passwords do not match' })
 
 export const resendVerificationSchema = z.object({ email: emailSchema })
 

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useOutletContext, useSearchParams } from 'react-router-dom'
-import { ArrowDownToLineIcon, CheckIcon, SearchIcon, ShieldCheckIcon, UsersIcon, XCircleIcon } from 'lucide-react'
+import { ArrowDownToLineIcon, CheckIcon, MailWarningIcon, ScanFaceIcon, SearchIcon, ShieldCheckIcon, UsersIcon, XCircleIcon } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
@@ -16,13 +16,21 @@ import { cn } from '@/lib/utils'
 import { exportUsers, listUsers } from '@/services/admin.service'
 
 const PAGE_SIZE = 10
-const FILTER_KEYS = ['q', 'kycStatus', 'accountStatus', 'registeredWithin', 'submittedWithin']
+const FILTER_KEYS = ['q', 'kycStatus', 'emailStatus', 'faceStatus', 'accountStatus', 'registeredWithin', 'submittedWithin']
+const FACE_FILTER = [
+  { value: 'pending', label: 'Face scan: to review' },
+  { value: 'none', label: 'Face scan: not added' },
+  { value: 'approved', label: 'Face scan: approved' },
+  { value: 'rejected', label: 'Face scan: rejected' },
+]
 
 const TABS = [
   { value: '', label: 'All Users', stat: 'total' },
   { value: 'pending', label: 'KYC Pending', stat: 'pending' },
   { value: 'approved', label: 'Approved', stat: 'approved' },
   { value: 'rejected', label: 'Rejected', stat: 'rejected' },
+  // Registered but never confirmed their email — an admin can activate them by hand
+  { value: '', emailStatus: 'unverified', label: 'Email Not Verified', stat: 'unverified' },
 ]
 
 const KPIS = [
@@ -145,14 +153,14 @@ export default function AdminUsersPage() {
       {/* KYC status tabs */}
       <div role="tablist" aria-label="KYC status" className="mt-[18.75px] flex overflow-x-auto rounded-lg border bg-card p-[5px]">
         {TABS.map((tab) => {
-          const active = filters.kycStatus === tab.value
+          const active = filters.kycStatus === tab.value && filters.emailStatus === (tab.emailStatus ?? '')
           return (
             <button
               key={tab.label}
               type="button"
               role="tab"
               aria-selected={active}
-              onClick={() => setParams({ kycStatus: tab.value })}
+              onClick={() => setParams({ kycStatus: tab.value, emailStatus: tab.emailStatus ?? '' })}
               className={cn(
                 'flex min-h-[52.5px] flex-1 items-center justify-center gap-[8.75px] rounded-[7.5px] px-4 text-title whitespace-nowrap text-muted-foreground transition-colors hover:bg-muted',
                 active && 'bg-primary-soft font-bold text-foreground hover:bg-primary-soft',
@@ -171,6 +179,25 @@ export default function AdminUsersPage() {
           )
         })}
       </div>
+
+      {stats?.facePending > 0 && (
+        <button
+          type="button"
+          onClick={() => setParams({ faceStatus: 'pending', kycStatus: '', emailStatus: '' })}
+          className="mt-[12.5px] flex w-full flex-wrap items-center gap-3 rounded-lg border border-warning/30 bg-warning-soft px-4 py-3 text-left transition-colors hover:border-warning/60"
+        >
+          <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-card text-warning">
+            <ScanFaceIcon className="size-5" />
+          </span>
+          <span className="flex-1 text-title">
+            <span className="font-bold">
+              {stats.facePending} face scan{stats.facePending > 1 ? 's' : ''} awaiting review
+            </span>
+            <span className="text-muted-foreground"> · approving one releases the commission it was holding back</span>
+          </span>
+          <span className="text-title font-semibold text-primary">Review →</span>
+        </button>
+      )}
 
       {/* KPIs */}
       <div className="mt-[12.5px] grid grid-cols-2 gap-[11.25px] xl:grid-cols-4">
@@ -204,13 +231,20 @@ export default function AdminUsersPage() {
               aria-label="Search users"
             />
           </label>
-          <div className="grid w-full grid-cols-1 gap-[8.75px] sm:grid-cols-2 lg:w-auto lg:flex-1 xl:grid-cols-4">
+          <div className="grid w-full grid-cols-1 gap-[8.75px] sm:grid-cols-2 lg:w-auto lg:flex-1 xl:grid-cols-5">
             <FilterSelect
               label="KYC status"
               allLabel="All KYC Statuses"
               options={Object.entries(KYC_STATUS).map(([value, s]) => ({ value, label: s.label }))}
               value={filters.kycStatus}
               onChange={(v) => setParams({ kycStatus: v })}
+            />
+            <FilterSelect
+              label="Face scan"
+              allLabel="All Face Scans"
+              options={FACE_FILTER}
+              value={filters.faceStatus}
+              onChange={(v) => setParams({ faceStatus: v })}
             />
             <FilterSelect
               label="Account status"
@@ -280,7 +314,19 @@ export default function AdminUsersPage() {
                     </td>
                     <td className={`${td} text-title text-muted-foreground`}>{formatDate(u.registeredAt)}</td>
                     <td className={td}>
-                      <StatusBadge tone={kyc.tone} icon={false}>{kyc.label}</StatusBadge>
+                      {u.faceStatus === 'pending' && (
+                        <StatusBadge tone="warning" icon={false} className="mb-1.5 block w-fit">
+                          Face scan to review
+                        </StatusBadge>
+                      )}
+                      {u.emailVerified ? (
+                        <StatusBadge tone={kyc.tone} icon={false}>{kyc.label}</StatusBadge>
+                      ) : (
+                        <StatusBadge tone="danger" icon={false}>
+                          <MailWarningIcon className="size-4" />
+                          Email not verified
+                        </StatusBadge>
+                      )}
                     </td>
                     <td className={td}>
                       <StatusBadge tone={account.tone} icon={false}>{account.label}</StatusBadge>

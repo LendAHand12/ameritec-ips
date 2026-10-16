@@ -17,6 +17,7 @@ import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Spinner } from '@/components/ui/spinner'
+import { useAdminAuth } from '@/hooks/useAdminAuth'
 import StatusBadge from '@/components/dashboard/StatusBadge'
 import ImagePreview from '@/components/support/ImagePreview'
 import { ACCEPTED_IMAGE_TYPES } from '@/components/auth/DocumentUpload'
@@ -145,6 +146,8 @@ function activityText(a) {
 const ACTIVITY_ICON = { created: PlusCircleIcon, status: ArrowRightLeftIcon, priority: FlagIcon, assignment: UserRoundIcon, escalated: FlagIcon }
 
 export default function AdminSupportTicketPage() {
+  const { can } = useAdminAuth()
+  const canManage = can('support:manage')
   const { id } = useParams()
   const [ticket, setTicket] = useState(null)
   const [error, setError] = useState(null)
@@ -249,14 +252,14 @@ export default function AdminSupportTicketPage() {
               value={ticket.status}
               options={Object.entries(ADMIN_TICKET_STATUS).map(([value, s]) => ({ value, label: s.label }))}
               onChange={(v) => v !== ticket.status && update({ status: v }, 'Status updated')}
-              disabled={busy === 'update'}
+              disabled={busy === 'update' || !canManage}
             />
             <LabeledSelect
               label="Priority"
               value={ticket.priority}
               options={Object.entries(TICKET_PRIORITY).map(([value, p]) => ({ value, label: p.label }))}
               onChange={(v) => v !== ticket.priority && update({ priority: v }, 'Priority updated')}
-              disabled={busy === 'update'}
+              disabled={busy === 'update' || !canManage}
             />
             <LabeledSelect
               label="Assigned To"
@@ -266,7 +269,7 @@ export default function AdminSupportTicketPage() {
                 const next = v === UNASSIGNED ? null : v
                 if (next !== (ticket.assignedTo?.id ?? null)) update({ assignedTo: next }, next ? 'Ticket assigned' : 'Ticket unassigned')
               }}
-              disabled={busy === 'update' || !agents}
+              disabled={busy === 'update' || !agents || !canManage}
             />
           </div>
         </div>
@@ -292,6 +295,7 @@ export default function AdminSupportTicketPage() {
         </dl>
       </section>
 
+{canManage && (
       <div className="flex flex-wrap justify-end gap-2.5 pt-2.5">
         <Button
           variant="outline"
@@ -311,6 +315,7 @@ export default function AdminSupportTicketPage() {
           {resolved ? 'Reopen Ticket' : 'Resolve Ticket'}
         </Button>
       </div>
+)}
 
       <div className="grid grid-cols-[minmax(0,1fr)] items-start gap-2.5 pt-2.5 xl:grid-cols-[minmax(0,1fr)_420px]">
         <div className="space-y-2.5">
@@ -355,6 +360,7 @@ export default function AdminSupportTicketPage() {
               })}
             </ol>
 
+{canManage && (
             <form onSubmit={sendReply} className="mt-5 rounded-lg border p-[13.75px]">
               <label htmlFor="public-reply" className="block text-caption font-semibold tracking-wide text-muted-foreground uppercase">
                 Public Reply
@@ -406,6 +412,7 @@ export default function AdminSupportTicketPage() {
                 </span>
               </div>
             </form>
+)}
           </Card>
 
           {/* Internal notes */}
@@ -428,6 +435,7 @@ export default function AdminSupportTicketPage() {
                 ))}
               </ol>
             )}
+{canManage && (
             <form onSubmit={saveNote}>
               <label htmlFor="internal-note" className="sr-only">
                 Internal note
@@ -451,6 +459,7 @@ export default function AdminSupportTicketPage() {
                 Add Internal Note
               </Button>
             </form>
+)}
           </Card>
 
           {/* Activity */}

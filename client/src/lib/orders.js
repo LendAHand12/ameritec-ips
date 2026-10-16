@@ -1,5 +1,6 @@
 export const ORDER_STATUS = {
   awaiting_payment: { label: 'Awaiting Payment', tone: 'neutral' },
+  paying: { label: 'Paying', tone: 'warning' },
   verifying: { label: 'Verifying', tone: 'warning' },
   pending_review: { label: 'Pending Review', tone: 'warning' },
   completed: { label: 'Completed', tone: 'success' },

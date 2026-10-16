@@ -6,10 +6,12 @@ import { kycUpload } from '../middlewares/upload.js'
 import { authLimiter, otpLimiter } from '../middlewares/rateLimit.js'
 import {
   accountInfoSchema,
+  forgotPasswordSchema,
   loginSchema,
   loginTwoFactorSchema,
   registerSchema,
   resendVerificationSchema,
+  resetPasswordSchema,
   twoFactorSetupSchema,
   twoFactorVerifySetupSchema,
   verifyEmailSchema,
@@ -28,6 +30,7 @@ router.post(
     { name: 'documentFront', maxCount: 1 },
     { name: 'documentBack', maxCount: 1 },
     { name: 'supportingDocument', maxCount: 1 },
+    { name: 'face', maxCount: 1 },
   ]),
   validate(registerSchema),
   auth.register,
@@ -36,6 +39,10 @@ router.post(
 // Email verification
 router.post('/verify-email', otpLimiter, validate(verifyEmailSchema), auth.verifyEmail)
 router.post('/resend-verification', authLimiter, validate(resendVerificationSchema), auth.resendVerification)
+
+// Password reset (code sent by email)
+router.post('/forgot-password', otpLimiter, validate(forgotPasswordSchema), auth.forgotPassword)
+router.post('/reset-password', otpLimiter, validate(resetPasswordSchema), auth.resetPassword)
 
 // Login / session
 router.post('/login', authLimiter, validate(loginSchema), auth.login)

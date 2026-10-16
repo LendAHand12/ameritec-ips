@@ -136,6 +136,9 @@ export default function StepTwoFactor({ email, value, onBack, onNext }) {
         nextDisabled={!setup || code.length !== 6}
         loading={verifying}
       />
+      <button type="button" onClick={() => onNext(null)} className="-mt-2 self-center text-title font-semibold text-primary hover:underline">
+        Skip for now — I’ll turn it on later
+      </button>
     </div>
   )
 }

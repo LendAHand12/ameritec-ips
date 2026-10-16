@@ -22,9 +22,13 @@ import AdminAuthProvider from '@/context/AdminAuthProvider'
 import AdminAuthLayout from '@/layouts/AdminAuthLayout'
 import AdminLayout from '@/layouts/AdminLayout'
 import AdminGuestRoute from '@/components/routes/AdminGuestRoute'
+import AdminPermissionRoute from '@/components/routes/AdminPermissionRoute'
+import AdminReferralsPage from '@/pages/admin/AdminReferralsPage'
+import AdminAccountsPage from '@/pages/admin/AdminAccountsPage'
 import AdminProtectedRoute from '@/components/routes/AdminProtectedRoute'
 import AdminLoginPage from '@/pages/admin/AdminLoginPage'
 import AdminPlaceholderPage from '@/pages/admin/AdminPlaceholderPage'
+import AdminOverviewPage from '@/pages/admin/AdminOverviewPage'
 import AdminUsersPage from '@/pages/admin/AdminUsersPage'
 import AdminTransactionsPage from '@/pages/admin/AdminTransactionsPage'
 import AdminParametersPage from '@/pages/admin/AdminParametersPage'
@@ -86,16 +90,43 @@ const router = createBrowserRouter([
               {
                 element: <AdminLayout />,
                 children: [
-                  { index: true, element: <AdminPlaceholderPage />, handle: { title: 'Overview' } },
-                  { path: 'users', element: <AdminUsersPage />, handle: { title: 'Users & KYC' } },
-                  { path: 'transactions', element: <AdminTransactionsPage />, handle: { title: 'Transactions' } },
-                  { path: 'parameters', element: <AdminParametersPage />, handle: { title: 'Operational Parameters' } },
-                  { path: 'support', element: <AdminSupportPage />, handle: { title: 'Support' } },
-                  { path: 'support/tickets/:id', element: <AdminSupportTicketPage />, handle: { title: 'Support' } },
-                  { path: 'audit-logs', element: <AdminAuditLogsPage />, handle: { title: 'Audit Logs' } },
+                  {
+                    element: <AdminPermissionRoute permission="overview:view" />,
+                    children: [{ index: true, element: <AdminOverviewPage />, handle: { title: 'Overview' } }],
+                  },
+                  {
+                    element: <AdminPermissionRoute permission="users:view" />,
+                    children: [{ path: 'users', element: <AdminUsersPage />, handle: { title: 'Users & KYC' } }],
+                  },
+                  {
+                    element: <AdminPermissionRoute permission="orders:view" />,
+                    children: [{ path: 'transactions', element: <AdminTransactionsPage />, handle: { title: 'Transactions' } }],
+                  },
+                  {
+                    element: <AdminPermissionRoute permission="referrals:view" />,
+                    children: [{ path: 'referrals', element: <AdminReferralsPage />, handle: { title: 'Referral & Commission' } }],
+                  },
+                  {
+                    element: <AdminPermissionRoute permission="parameters:view" />,
+                    children: [{ path: 'parameters', element: <AdminParametersPage />, handle: { title: 'Operational Parameters' } }],
+                  },
+                  {
+                    element: <AdminPermissionRoute permission="support:view" />,
+                    children: [
+                      { path: 'support', element: <AdminSupportPage />, handle: { title: 'Support' } },
+                      { path: 'support/tickets/:id', element: <AdminSupportTicketPage />, handle: { title: 'Support' } },
+                    ],
+                  },
+                  {
+                    element: <AdminPermissionRoute permission="audit:view" />,
+                    children: [{ path: 'audit-logs', element: <AdminAuditLogsPage />, handle: { title: 'Audit Logs' } }],
+                  },
+                  {
+                    element: <AdminPermissionRoute permission="admins:manage" />,
+                    children: [{ path: 'admins', element: <AdminAccountsPage />, handle: { title: 'Admins & Permissions' } }],
+                  },
                   ...[
                     ['shares', 'Shares'],
-                    ['referrals', 'Referral & Commission'],
                     ['settings', 'Settings'],
                   ].map(([path, title]) => ({ path, element: <AdminPlaceholderPage />, handle: { title } })),
                 ],

@@ -4,6 +4,7 @@ export const SHARE_TYPES = ['A', 'B']
 export const PAYMENT_METHODS = ['bep20', 'zelle']
 export const ORDER_STATUS = {
   AWAITING_PAYMENT: 'awaiting_payment', // created, user hasn't paid yet
+  PAYING: 'paying', // user picked USDT and is paying from their wallet
   VERIFYING: 'verifying', // BEP20 tx submitted, waiting for on-chain confirmations
   PENDING_REVIEW: 'pending_review', // Zelle (or a BEP20 the system couldn't verify) waiting for an admin
   COMPLETED: 'completed',
@@ -25,7 +26,15 @@ const orderSchema = new mongoose.Schema(
     paymentMethod: { type: String, enum: PAYMENT_METHODS },
     // BEP20: a tx hash can only ever pay for one order
     txHash: { type: String, lowercase: true, unique: true, sparse: true },
+    // Tx hash of an unfinished order whose user was deleted; freed so it can be used again
+    releasedTxHash: String,
     paymentError: String,
+    // Background audit of a wallet payment that was accepted instantly; only used to alert admins
+    chainCheck: {
+      state: { type: String, enum: ['pending', 'verified', 'invalid'] },
+      reason: String,
+      checkedAt: Date,
+    },
     zelleReference: String,
     paidAt: Date,
     completedAt: Date,

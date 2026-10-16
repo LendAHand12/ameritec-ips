@@ -5,6 +5,7 @@ import {
   ArrowRightLeftIcon,
   BellIcon,
   BookOpenIcon,
+  KeyRoundIcon,
   ChevronDownIcon,
   LayoutGridIcon,
   LifeBuoyIcon,
@@ -33,16 +34,19 @@ import { cn } from '@/lib/utils'
 import { getOrderStats, getSupportStats, getUserStats } from '@/services/admin.service'
 
 const ADMIN_NAV = [
-  { to: '/admin', label: 'Overview', icon: LayoutGridIcon, end: true },
-  { to: '/admin/users', label: 'Users & KYC', icon: UsersIcon, badge: 'pending' },
-  { to: '/admin/transactions', label: 'Transactions', icon: ArrowRightLeftIcon, badge: 'ordersPending' },
+  { to: '/admin', label: 'Overview', icon: LayoutGridIcon, end: true, perm: 'overview:view' },
+  { to: '/admin/users', label: 'Users & KYC', icon: UsersIcon, badge: 'pending', perm: 'users:view' },
+  { to: '/admin/transactions', label: 'Transactions', icon: ArrowRightLeftIcon, badge: 'ordersPending', perm: 'orders:view' },
   { to: '/admin/shares', label: 'Shares', icon: TrendingUpIcon },
-  { to: '/admin/referrals', label: 'Referral & Commission', icon: UsersIcon },
-  { to: '/admin/parameters', label: 'Operational Parameters', icon: SlidersHorizontalIcon },
-  { to: '/admin/support', label: 'Support', icon: LifeBuoyIcon, badge: 'supportPending' },
-  { to: '/admin/audit-logs', label: 'Audit Logs', icon: BookOpenIcon },
+  { to: '/admin/referrals', label: 'Referral & Commission', icon: UsersIcon, perm: 'referrals:view' },
+  { to: '/admin/parameters', label: 'Operational Parameters', icon: SlidersHorizontalIcon, perm: 'parameters:view' },
+  { to: '/admin/support', label: 'Support', icon: LifeBuoyIcon, badge: 'supportPending', perm: 'support:view' },
+  { to: '/admin/audit-logs', label: 'Audit Logs', icon: BookOpenIcon, perm: 'audit:view' },
+  { to: '/admin/admins', label: 'Admins & Permissions', icon: KeyRoundIcon, perm: 'admins:manage' },
   { to: '/admin/settings', label: 'Settings', icon: SettingsIcon },
 ]
+
+const ROLE_LABEL = { super_admin: 'Super admin', sub_admin: 'Sub admin' }
 
 const initials = (name = '') =>
   name
@@ -54,7 +58,8 @@ const initials = (name = '') =>
     .toUpperCase()
 
 function Sidebar({ stats, onSignOut, onNavigate }) {
-  const { admin } = useAdminAuth()
+  const { admin, can } = useAdminAuth()
+  const roleLabel = ROLE_LABEL[admin.role] ?? 'Administrator'
   return (
     <div className="flex h-full flex-col bg-black px-[15px] pb-[16.25px]">
       <div className="flex min-h-[95px] items-center border-b border-white/10 px-2.5">
@@ -63,7 +68,7 @@ function Sidebar({ stats, onSignOut, onNavigate }) {
 
       <nav aria-label="Admin navigation" className="flex-1 overflow-y-auto pt-[21.25px]">
         <p className="px-[13.75px] pb-2.5 text-caption font-bold text-muted-foreground">OPERATIONS</p>
-        {ADMIN_NAV.map(({ to, label, icon, end, badge }) => {
+        {ADMIN_NAV.filter((item) => !item.perm || can(item.perm)).map(({ to, label, icon, end, badge }) => {
           const Icon = icon
           const count = badge ? stats?.[badge] : undefined
           return (
@@ -95,7 +100,7 @@ function Sidebar({ stats, onSignOut, onNavigate }) {
         <div className="flex items-center gap-2.5 rounded-lg border border-white/10 bg-white/4 p-[12.5px]">
           <ShieldCheckIcon className="size-[25px] shrink-0 text-steel" />
           <div className="space-y-[3.75px] text-caption">
-            <p className="font-bold text-[#e8e8e8]">Administrator access</p>
+            <p className="font-bold text-[#e8e8e8]">{roleLabel} access</p>
             <p className="text-muted-foreground">Actions are permission-aware</p>
           </div>
         </div>
@@ -107,7 +112,7 @@ function Sidebar({ stats, onSignOut, onNavigate }) {
         </span>
         <div className="min-w-0 flex-1 space-y-[3.75px] text-caption">
           <p className="truncate font-bold text-white">{admin.fullName}</p>
-          <p className="text-subtle">Administrator</p>
+          <p className="text-subtle">{roleLabel}</p>
         </div>
         <button
           type="button"
@@ -123,20 +128,26 @@ function Sidebar({ stats, onSignOut, onNavigate }) {
 }
 
 export default function AdminLayout() {
-  const { admin, logout } = useAdminAuth()
+  const { admin, logout, can } = useAdminAuth()
   const navigate = useNavigate()
   const location = useLocation()
   const matches = useMatches()
   const title = [...matches].reverse().find((m) => m.handle?.title)?.handle.title ?? 'Admin'
+  const roleLabel = ROLE_LABEL[admin.role] ?? 'Administrator'
   const [stats, setStats] = useState(null)
   const [menuOpen, setMenuOpen] = useState(false)
 
   const refreshStats = useCallback(
     () =>
-      Promise.all([getUserStats(), getOrderStats(), getSupportStats()])
-        .then(([users, orders, support]) => setStats({ ...users.data, ordersPending: orders.data.pendingReview, supportPending: support.needsAttention }))
+      // Sidebar counters only for the areas this admin can open
+      Promise.all([
+        can('users:view') ? getUserStats().then((r) => r.data) : {},
+        can('orders:view') ? getOrderStats().then((r) => ({ ordersPending: r.data.pendingReview })) : {},
+        can('support:view') ? getSupportStats().then((r) => ({ supportPending: r.needsAttention })) : {},
+      ])
+        .then((parts) => setStats(Object.assign({}, ...parts)))
         .catch(() => {}),
-    [],
+    [can],
   )
   // Refresh the sidebar counters on every navigation
   useEffect(() => {
@@ -200,7 +211,7 @@ export default function AdminLayout() {
               </span>
               <span className="hidden flex-col items-start gap-[2.5px] text-caption sm:flex">
                 <span className="font-bold">{admin.fullName}</span>
-                <span className="text-muted-foreground">Administrator</span>
+                <span className="text-muted-foreground">{roleLabel}</span>
               </span>
               <ChevronDownIcon className="size-[18.75px] text-muted-foreground" />
             </DropdownMenuTrigger>

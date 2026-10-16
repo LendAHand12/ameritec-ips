@@ -87,10 +87,10 @@ export default function StepReview({ data, onEdit, onBack, onSubmit, submitting 
       <Section title="Security">
         <dl className="space-y-2">
           <Row label="Face ID">
-            <Badge variant="secondary">{face?.completed ? 'Enrolled' : 'Coming soon'}</Badge>
+            <Badge variant={face?.file ? 'default' : 'secondary'}>{face?.file ? 'Photo added — pending review' : 'Skipped — add later'}</Badge>
           </Row>
           <Row label="Two-factor auth">
-            <Badge variant={twoFactor ? 'default' : 'destructive'}>{twoFactor ? 'Enabled' : 'Not set up'}</Badge>
+            <Badge variant={twoFactor ? 'default' : 'secondary'}>{twoFactor ? 'Enabled' : 'Skipped — optional'}</Badge>
           </Row>
         </dl>
       </Section>

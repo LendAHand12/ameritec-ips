@@ -52,9 +52,9 @@ export default function ReferralLinkCard({ code }) {
           <CopyButton value={link} label="Referral link" className="h-10 font-bold">
             Copy Link
           </CopyButton>
-          <CopyButton value={code} label="Referral code" className="h-10 font-bold">
+          {/* <CopyButton value={code} label="Referral code" className="h-10 font-bold">
             Copy Code
-          </CopyButton>
+          </CopyButton> */}
           <Button type="button" variant="outline" className="h-10 bg-card font-bold" onClick={share}>
             <Share2Icon />
             Share

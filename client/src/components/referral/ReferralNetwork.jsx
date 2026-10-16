@@ -144,7 +144,7 @@ export default function ReferralNetwork({ rootName, members }) {
       <PanelHeader
         className="px-[25px]"
         title="Referral Network"
-        description="Explore your network while protecting member privacy."
+        description="Everyone who joined through you, down to F3."
         action={<SegmentedControl label="View" options={VIEW_OPTIONS} value={view} onChange={setView} />}
       />
 

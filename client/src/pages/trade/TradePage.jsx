@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { ArrowRightIcon, CalculatorIcon, CheckIcon, InfoIcon, ShieldCheckIcon, TrendingUpIcon } from 'lucide-react'
+import { ArrowRightIcon, BanknoteIcon, CalculatorIcon, CheckIcon, CoinsIcon, InfoIcon, ShieldCheckIcon, TrendingUpIcon } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
@@ -12,6 +12,7 @@ import OrdersTable from '@/components/trade/OrdersTable'
 import { useAsync } from '@/hooks/useAsync'
 import { formatInt, formatUsdt } from '@/lib/format'
 import { cn } from '@/lib/utils'
+import { walletConfigured } from '@/lib/wallet-config'
 import { createOrder, getTradeConfig, listOrders } from '@/services/trade.service'
 
 const QUICK_AMOUNTS = [100, 500, 1000, 5000]
@@ -63,6 +64,7 @@ export default function TradePage() {
   const [amountInput, setAmountInput] = useState('1000')
   const [shareType, setShareType] = useState('A')
   const [confirming, setConfirming] = useState(false)
+  const [paymentMethod, setPaymentMethod] = useState(null)
   const [submitting, setSubmitting] = useState(false)
 
   const share = config?.shares.find((s) => s.type === shareType)
@@ -71,7 +73,7 @@ export default function TradePage() {
   const shares = priceCents ? Math.floor(Math.round(amount * 100) / priceCents) : 0
   const total = (shares * priceCents) / 100
   const rounded = shares > 0 && Math.abs(total - amount) > 0.001
-  const hasPaymentMethod = !!(config?.paymentMethods.bep20 || config?.paymentMethods.zelle)
+  const hasPaymentMethod = !!((config?.paymentMethods.bep20 && walletConfigured) || config?.paymentMethods.zelle)
   const minCents = Math.round((config?.minPurchase.amount ?? 0) * 100)
   const minLabel = config?.minPurchase.firstPurchase ? 'Minimum first purchase' : 'Minimum purchase'
   // Whole shares only, so the smallest valid payment can sit slightly above the minimum
@@ -86,11 +88,32 @@ export default function TradePage() {
           ? `${minLabel} is ${formatUsdt(minCents / 100)} USDT${minTotalCents !== minCents ? ` — at least ${formatUsdt(minTotalCents / 100)} USDT for whole ${share.label} shares` : ''}`
           : ''
 
+  const methodOptions = [
+    {
+      value: 'bep20',
+      label: 'USDT (BEP20)',
+      description: 'Pay from your crypto wallet — MetaMask, Trust Wallet and more, on BNB Smart Chain.',
+      icon: CoinsIcon,
+      available: !!config?.paymentMethods.bep20 && walletConfigured,
+      unavailable: config?.paymentMethods.bep20 ? 'Wallet payments are not set up yet. Please contact support.' : 'USDT payments are not available right now.',
+    },
+    {
+      value: 'zelle',
+      label: 'Zelle',
+      description: 'Send a Zelle transfer, then tell us you’ve paid. Our team confirms it.',
+      icon: BanknoteIcon,
+      available: !!config?.paymentMethods.zelle,
+      unavailable: 'Zelle is only available for US (+1) phone numbers.',
+    },
+  ]
+  const selectedMethod = methodOptions.find((m) => m.value === paymentMethod && m.available) ?? methodOptions.find((m) => m.available)
+
   const handleConfirm = async () => {
+    if (!selectedMethod) return
     setSubmitting(true)
     try {
       const { order } = await createOrder({ shareType, amount: total })
-      navigate(`/trade/orders/${order.id}`)
+      navigate(`/trade/orders/${order.id}?method=${selectedMethod.value}`)
     } catch (err) {
       toast.error(err.message)
       setSubmitting(false)
@@ -317,8 +340,8 @@ export default function TradePage() {
       <Dialog open={confirming} onOpenChange={(open) => !submitting && setConfirming(open)}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle className="text-subheading font-bold">Confirm purchase</DialogTitle>
-            <DialogDescription>You’ll choose a payment method on the next screen.</DialogDescription>
+            <DialogTitle className="text-subheading font-bold">Choose payment method</DialogTitle>
+            <DialogDescription>Review your purchase and pick how you’d like to pay.</DialogDescription>
           </DialogHeader>
           {share && (
             <dl className="rounded-lg border px-4 py-1">
@@ -330,10 +353,46 @@ export default function TradePage() {
               </SummaryRow>
             </dl>
           )}
+          <div role="radiogroup" aria-label="Payment method" className="grid gap-2.5">
+            {methodOptions.map((m) => {
+              const Icon = m.icon
+              const selected = selectedMethod?.value === m.value
+              return (
+                <button
+                  key={m.value}
+                  type="button"
+                  role="radio"
+                  aria-checked={selected}
+                  disabled={!m.available || submitting}
+                  onClick={() => setPaymentMethod(m.value)}
+                  className={cn(
+                    'flex items-center gap-3 rounded-lg border px-4 py-3 text-left transition-colors outline-none focus-visible:ring-3 focus-visible:ring-ring/30 disabled:cursor-not-allowed disabled:opacity-55',
+                    selected ? 'border-primary bg-primary-soft' : 'bg-card enabled:hover:border-primary/50',
+                  )}
+                >
+                  <span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-muted text-foreground">
+                    <Icon className="size-5" />
+                  </span>
+                  <span className="flex-1">
+                    <span className="block text-title font-bold">{m.label}</span>
+                    <span className="block text-caption text-muted-foreground">{m.available ? m.description : m.unavailable}</span>
+                  </span>
+                  <span
+                    className={cn(
+                      'flex size-[22.5px] shrink-0 items-center justify-center rounded-full border',
+                      selected && 'border-primary bg-primary text-white',
+                    )}
+                  >
+                    {selected && <CheckIcon className="size-[16.25px]" />}
+                  </span>
+                </button>
+              )
+            })}
+          </div>
           <div className="grid gap-2 sm:grid-cols-[2fr_3fr]">
-            <Button size="lg" className="sm:order-last" onClick={handleConfirm} disabled={submitting}>
+            <Button size="lg" className="sm:order-last" onClick={handleConfirm} disabled={submitting || !selectedMethod}>
               {submitting && <Spinner />}
-              Confirm & continue to payment
+              Continue to payment
             </Button>
             <Button size="lg" variant="outline" onClick={() => setConfirming(false)} disabled={submitting}>
               Back

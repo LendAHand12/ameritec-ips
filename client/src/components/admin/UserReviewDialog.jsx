@@ -1,13 +1,15 @@
 import { useEffect, useState } from 'react'
-import { ExternalLinkIcon, LockIcon, LockOpenIcon } from 'lucide-react'
+import { ExternalLinkIcon, LockIcon, ScanFaceIcon, LockOpenIcon, MailCheckIcon, MailWarningIcon, PencilIcon, Trash2Icon } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Spinner } from '@/components/ui/spinner'
+import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
+import { useAdminAuth } from '@/hooks/useAdminAuth'
 import StatusBadge from '@/components/dashboard/StatusBadge'
 import { ACCOUNT_STATUS, DOCUMENT_TYPE_LABEL, KYC_STATUS } from '@/lib/adminUsers'
-import { formatDate } from '@/lib/format'
+import { formatDate, formatUsdt } from '@/lib/format'
 import * as adminService from '@/services/admin.service'
 
 function Row({ label, children }) {
@@ -36,9 +38,14 @@ function DocImage({ userId, side, label }) {
 
 /** Review a user's KYC application: approve / reject, lock / unlock. */
 export default function UserReviewDialog({ userId, onClose, onChanged }) {
+  const { can } = useAdminAuth()
+  const canManage = can('users:manage')
   const [user, setUser] = useState(null)
   const [busy, setBusy] = useState(null)
-  const [mode, setMode] = useState(null) // 'reject' | 'lock' while asking for a reason
+  const [mode, setMode] = useState(null) // 'reject' | 'lock' | 'delete' | 'faceReject' while asking for a reason
+  const [editingReferrer, setEditingReferrer] = useState(false)
+  const [confirmingVerify, setConfirmingVerify] = useState(false)
+  const [referrerCode, setReferrerCode] = useState('')
   const [reason, setReason] = useState('')
 
   useEffect(() => {
@@ -46,6 +53,8 @@ export default function UserReviewDialog({ userId, onClose, onChanged }) {
     setUser(null)
     setMode(null)
     setReason('')
+    setEditingReferrer(false)
+    setConfirmingVerify(false)
     adminService
       .getUser(userId)
       .then(({ data }) => setUser(data))
@@ -74,6 +83,22 @@ export default function UserReviewDialog({ userId, onClose, onChanged }) {
   const kyc = user && KYC_STATUS[user.status]
   const account = user && ACCOUNT_STATUS[user.accountStatus]
   const locked = user?.accountStatus === 'locked'
+  const deleted = !!user?.deletedAt
+
+  const saveReferrer = async () => {
+    setBusy('referrer')
+    try {
+      const { data } = await adminService.changeUserReferrer(user._id, referrerCode.trim())
+      setUser((prev) => ({ ...prev, referredBy: data.referredBy }))
+      setEditingReferrer(false)
+      toast.success('Referrer updated')
+      onChanged?.()
+    } catch (err) {
+      toast.error(err.details?.referralCode ?? err.message)
+    } finally {
+      setBusy(null)
+    }
+  }
 
   return (
     <Dialog open={!!userId} onOpenChange={(open) => !open && onClose()}>
@@ -97,9 +122,44 @@ export default function UserReviewDialog({ userId, onClose, onChanged }) {
               <dl>
                 <Row label="Email">{user.email}</Row>
                 <Row label="Phone">{user.phone}</Row>
+                <Row label="Email verified">{user.emailVerified ? 'Yes' : 'No'}</Row>
                 <Row label="Referral code">{user.referralCode}</Row>
                 <Row label="Referred by">
-                  {user.referredBy ? `${user.referredBy.fullName} (${user.referredBy.referralCode})` : null}
+                  {editingReferrer ? (
+                    <span className="flex flex-wrap items-center gap-2">
+                      <Input
+                        value={referrerCode}
+                        onChange={(e) => setReferrerCode(e.target.value.toUpperCase())}
+                        placeholder="New referral code (empty = none)"
+                        className="h-9 w-56"
+                        autoFocus
+                      />
+                      <Button size="sm" onClick={saveReferrer} disabled={busy === 'referrer'}>
+                        {busy === 'referrer' && <Spinner />}
+                        Save
+                      </Button>
+                      <Button size="sm" variant="outline" onClick={() => setEditingReferrer(false)} disabled={busy === 'referrer'}>
+                        Cancel
+                      </Button>
+                    </span>
+                  ) : (
+                    <span className="flex flex-wrap items-center gap-2">
+                      {user.referredBy ? `${user.referredBy.fullName} (${user.referredBy.referralCode})` : '—'}
+                      {canManage && !deleted && (
+                        <button
+                          type="button"
+                          className="inline-flex items-center gap-1 text-caption font-semibold text-primary hover:underline"
+                          onClick={() => {
+                            setReferrerCode(user.referredBy?.referralCode ?? '')
+                            setEditingReferrer(true)
+                          }}
+                        >
+                          <PencilIcon className="size-3" />
+                          Change
+                        </button>
+                      )}
+                    </span>
+                  )}
                 </Row>
               </dl>
               <dl>
@@ -111,6 +171,78 @@ export default function UserReviewDialog({ userId, onClose, onChanged }) {
                 </Row>
               </dl>
             </div>
+
+            {user.wallet && (
+              <section className="rounded-lg border">
+                <div className="flex items-center justify-between gap-3 border-b bg-muted/50 px-3.5 py-2.5">
+                  <h3 className="text-sm font-semibold">Commission wallet</h3>
+                  <span className="text-caption text-muted-foreground">USDT</span>
+                </div>
+                <dl className="grid grid-cols-2 gap-px bg-border sm:grid-cols-4">
+                  {[
+                    ['Available', user.wallet.available, 'text-success'],
+                    ['Pending KYC', user.wallet.pending, user.wallet.pending > 0 ? 'text-warning' : ''],
+                    ['Requested', user.wallet.requested, ''],
+                    ['Withdrawn', user.wallet.withdrawn, ''],
+                  ].map(([label, value, tone]) => (
+                    <div key={label} className="bg-card px-3.5 py-3">
+                      <dt className="text-caption text-muted-foreground">{label}</dt>
+                      <dd className={`pt-0.5 text-title font-bold tabular-nums ${tone}`}>{formatUsdt(value)}</dd>
+                    </div>
+                  ))}
+                </dl>
+                <p className="border-t px-3.5 py-2.5 text-caption text-muted-foreground">
+                  Total earned <span className="font-semibold text-foreground">{formatUsdt(user.wallet.earned)} USDT</span> · Withdrawal wallet:{' '}
+                  {user.wallet.address ? <span className="font-mono break-all text-foreground">{user.wallet.address}</span> : <span>not set</span>}
+                </p>
+              </section>
+            )}
+
+            {!user.emailVerified && !deleted && (
+              <div className="space-y-2.5 rounded-lg border border-warning/30 bg-warning-soft p-3.5 text-sm">
+                <p className="flex items-center gap-2 font-semibold text-warning">
+                  <MailWarningIcon className="size-4" />
+                  This user hasn’t confirmed their email yet
+                </p>
+                <p className="text-muted-foreground">
+                  They can’t sign in or be KYC-reviewed until it is. If the verification email never reached them, you can verify it manually — only do this
+                  once you’re sure the address belongs to them. KYC review comes afterwards.
+                </p>
+                {canManage &&
+                  (confirmingVerify ? (
+                    <div className="flex flex-wrap gap-2">
+                      <Button
+                        size="sm"
+                        disabled={!!busy}
+                        onClick={() => run('verify', () => adminService.verifyUserEmail(user._id), 'Email verified')}
+                      >
+                        {busy === 'verify' ? <Spinner /> : <MailCheckIcon />}
+                        Yes, verify {user.email}
+                      </Button>
+                      <Button size="sm" variant="outline" disabled={!!busy} onClick={() => setConfirmingVerify(false)}>
+                        Cancel
+                      </Button>
+                    </div>
+                  ) : (
+                    <Button size="sm" variant="outline" onClick={() => setConfirmingVerify(true)}>
+                      <MailCheckIcon />
+                      Verify email manually
+                    </Button>
+                  ))}
+              </div>
+            )}
+
+            {deleted && (
+              <div className="rounded-lg bg-danger-soft p-3 text-sm text-danger">
+                <p className="font-semibold">This user was deleted on {formatDate(user.deletedAt)}.</p>
+                {user.deletedSnapshot?.email && (
+                  <p>
+                    Former email {user.deletedSnapshot.email} and phone {user.deletedSnapshot.phone} can be used for a new account.
+                  </p>
+                )}
+                {user.deletedSnapshot?.reason && <p>Reason: {user.deletedSnapshot.reason}</p>}
+              </div>
+            )}
 
             {(user.rejectionReason || user.lockedReason) && (
               <div className="space-y-1 rounded-lg bg-muted p-3 text-sm">
@@ -138,15 +270,55 @@ export default function UserReviewDialog({ userId, onClose, onChanged }) {
               </div>
             </section>
 
-            {mode && (
+            {(user.face?.status ?? 'none') !== 'none' && (
+              <section className="rounded-lg border">
+                <div className="flex flex-wrap items-center justify-between gap-2 border-b bg-muted/50 px-3.5 py-2.5">
+                  <h3 className="flex items-center gap-2 text-sm font-semibold">
+                    <ScanFaceIcon className="size-4" />
+                    Face scan
+                  </h3>
+                  <StatusBadge
+                    tone={{ pending: 'warning', approved: 'success', rejected: 'danger' }[user.face.status]}
+                    icon={false}
+                    className="h-6"
+                  >
+                    {{ pending: 'Awaiting review', approved: 'Approved', rejected: 'Rejected' }[user.face.status]}
+                  </StatusBadge>
+                </div>
+                <div className="grid gap-4 p-3.5 sm:grid-cols-[180px_1fr]">
+                  <DocImage userId={user._id} side="face" label={user.face.submittedAt ? `Submitted ${formatDate(user.face.submittedAt)}` : 'Face scan'} />
+                  <div className="space-y-3 text-sm">
+                    <p className="text-muted-foreground">
+                      {user.face.status === 'pending' && 'Check that the photo is a clear, live selfie of the same person as on the identity document. Approving it releases commission held back for this user’s purchases.'}
+                      {user.face.status === 'approved' && `Approved${user.face.reviewedAt ? ` on ${formatDate(user.face.reviewedAt)}` : ''}.`}
+                      {user.face.status === 'rejected' && `Rejected${user.face.rejectionReason ? `: ${user.face.rejectionReason}` : ''}. The user can send a new photo.`}
+                    </p>
+                    {canManage && !deleted && user.face.status === 'pending' && (
+                      <div className="flex flex-wrap gap-2">
+                        <Button size="sm" disabled={!!busy} onClick={() => run('faceApprove', () => adminService.approveFace(user._id), 'Face scan approved')}>
+                          {busy === 'faceApprove' && <Spinner />}
+                          Approve face scan
+                        </Button>
+                        <Button size="sm" variant="outline" className="text-destructive" disabled={!!busy} onClick={() => setMode('faceReject')}>
+                          Reject
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </section>
+            )}
+
+            {mode && canManage && (
               <div className="space-y-2">
                 <label htmlFor="action-reason" className="text-sm font-semibold">
-                  {mode === 'reject' ? 'Rejection reason (shown to the user)' : 'Lock reason (internal, optional)'}
+                  {mode === 'reject' || mode === 'faceReject' ? 'Rejection reason (shown to the user)' : mode === 'delete' ? 'Deletion reason (internal, optional)' : 'Lock reason (internal, optional)'}
                 </label>
                 <Textarea id="action-reason" value={reason} onChange={(e) => setReason(e.target.value)} maxLength={500} autoFocus />
               </div>
             )}
 
+{canManage && !deleted && (
             <div className="flex flex-col-reverse gap-2 border-t pt-4 sm:flex-row sm:items-center">
               {mode ? (
                 <>
@@ -155,15 +327,20 @@ export default function UserReviewDialog({ userId, onClose, onChanged }) {
                   </Button>
                   <Button
                     className="sm:ml-auto"
-                    disabled={!!busy || (mode === 'reject' && !reason.trim())}
+                    disabled={!!busy || ((mode === 'reject' || mode === 'faceReject') && !reason.trim())}
+                    variant={mode === 'delete' ? 'destructive' : 'default'}
                     onClick={() =>
-                      mode === 'reject'
+                      mode === 'faceReject'
+                        ? run('faceReject', () => adminService.rejectFace(user._id, reason.trim()), 'Face scan rejected')
+                        : mode === 'reject'
                         ? run('reject', () => adminService.rejectUser(user._id, reason.trim()), 'Application rejected')
-                        : run('lock', () => adminService.lockUser(user._id, reason.trim() || undefined), 'Account locked')
+                        : mode === 'delete'
+                          ? run('delete', () => adminService.deleteUser(user._id, reason.trim() || undefined), 'User deleted')
+                          : run('lock', () => adminService.lockUser(user._id, reason.trim() || undefined), 'Account locked')
                     }
                   >
                     {busy && <Spinner />}
-                    {mode === 'reject' ? 'Confirm rejection' : 'Confirm lock'}
+                    {mode === 'reject' || mode === 'faceReject' ? 'Confirm rejection' : mode === 'delete' ? 'Confirm deletion' : 'Confirm lock'}
                   </Button>
                 </>
               ) : (
@@ -179,13 +356,17 @@ export default function UserReviewDialog({ userId, onClose, onChanged }) {
                       Lock account
                     </Button>
                   )}
+                  <Button variant="outline" className="text-destructive" disabled={!!busy} onClick={() => setMode('delete')}>
+                    <Trash2Icon />
+                    Delete user
+                  </Button>
                   <div className="flex gap-2 sm:ml-auto">
                     {user.status !== 'rejected' && (
                       <Button variant="destructive" className="flex-1" disabled={!!busy} onClick={() => setMode('reject')}>
                         Reject
                       </Button>
                     )}
-                    {user.status !== 'approved' && (
+                    {user.status !== 'approved' && user.emailVerified && (
                       <Button
                         className="flex-1"
                         disabled={!!busy}
@@ -199,6 +380,7 @@ export default function UserReviewDialog({ userId, onClose, onChanged }) {
                 </>
               )}
             </div>
+)}
           </>
         )}
       </DialogContent>

@@ -5,7 +5,7 @@ import { Panel } from './Panel'
 import StatusBadge from './StatusBadge'
 
 /** Security checks derived from the real user record. */
-function securityChecks(user) {
+export function securityChecks(user) {
   return [
     { label: 'Identity Verification', ok: user.status === 'approved', okText: 'Verified', badText: 'Pending' },
     { label: 'Two-factor authentication', ok: !!user.twoFactor?.enabled, okText: 'Enabled', badText: 'Disabled' },
@@ -14,7 +14,7 @@ function securityChecks(user) {
   ]
 }
 
-function scoreLabel(ratio) {
+export function scoreLabel(ratio) {
   if (ratio >= 1) return { text: 'Excellent', tone: 'text-success', bar: 'bg-success' }
   if (ratio >= 0.75) return { text: 'Good', tone: 'text-success', bar: 'bg-success' }
   if (ratio >= 0.5) return { text: 'Fair', tone: 'text-warning', bar: 'bg-warning' }

@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input'
 import { Spinner } from '@/components/ui/spinner'
 import { ShareSwatch } from '@/components/dashboard/ShareMarker'
 import { formatDate } from '@/lib/format'
+import { useAdminAuth } from '@/hooks/useAdminAuth'
 import * as adminService from '@/services/admin.service'
 
 function Section({ title, description, children }) {
@@ -33,16 +34,18 @@ function Field({ label, hint, error, children }) {
   )
 }
 
-function Toggle({ checked, onChange, label }) {
+function Toggle({ checked, onChange, label, disabled }) {
   return (
     <label className="flex cursor-pointer items-center gap-2.5 text-sm font-semibold">
-      <Checkbox checked={checked} onCheckedChange={(v) => onChange(v === true)} />
+      <Checkbox checked={checked} disabled={disabled} onCheckedChange={(v) => onChange(v === true)} />
       {label}
     </label>
   )
 }
 
 export default function AdminParametersPage() {
+  const { can } = useAdminAuth()
+  const canManage = can('parameters:manage')
   const [form, setForm] = useState(null)
   const [meta, setMeta] = useState(null)
   const [errors, setErrors] = useState({})
@@ -126,16 +129,20 @@ export default function AdminParametersPage() {
         <div>
           <h1 className="text-[26px] leading-tight font-bold tracking-[-0.01em] sm:text-heading">Operational Parameters</h1>
           <p className="pt-[6.25px] text-title text-muted-foreground">
-            Class prices, purchase minimums, referral commissions and payment methods.
+            Class prices, share allocation, purchase minimums, referral commissions and payment methods.
+            {!canManage && <span className="font-semibold"> View only.</span>}
             {meta?.updatedAt && <span className="text-caption"> Last updated {formatDate(meta.updatedAt)}.</span>}
           </p>
         </div>
+{canManage && (
         <Button type="submit" className="h-[50px] min-w-[140px] px-[21.25px] text-title font-bold" disabled={saving}>
           {saving && <Spinner className="size-5" />}
           Save changes
         </Button>
+)}
       </div>
 
+      <fieldset disabled={!canManage} className="min-w-0 space-y-[17.5px]">
       <div className="grid gap-[17.5px] lg:grid-cols-2">
         {['A', 'B'].map((t) => (
           <Section
@@ -160,6 +167,21 @@ export default function AdminParametersPage() {
                 min="0.01"
                 value={form.shares[t].price}
                 onChange={(e) => set(`shares.${t}.price`, e.target.value)}
+                required
+              />
+            </Field>
+            <Field
+              label="Shares available for sale"
+              hint={`Total Class ${t} shares offered; the Overview page shows how much is sold and remaining.`}
+              error={errors[`shares.${t}.allocation`]}
+            >
+              <Input
+                size="lg"
+                type="number"
+                step="1"
+                min="0"
+                value={form.shares[t].allocation}
+                onChange={(e) => set(`shares.${t}.allocation`, e.target.value)}
                 required
               />
             </Field>
@@ -218,7 +240,7 @@ export default function AdminParametersPage() {
 
       <div className="grid gap-[17.5px] lg:grid-cols-2">
         <Section title="USDT (BEP20)" description="Payments are verified automatically on BNB Smart Chain.">
-          <Toggle checked={form.payment.bep20.enabled} onChange={(v) => set('payment.bep20.enabled', v)} label="Accept USDT (BEP20) payments" />
+          <Toggle disabled={!canManage} checked={form.payment.bep20.enabled} onChange={(v) => set('payment.bep20.enabled', v)} label="Accept USDT (BEP20) payments" />
           <Field
             label="Receiving wallet address"
             hint="Double-check this address — funds sent to a wrong address cannot be recovered."
@@ -236,7 +258,7 @@ export default function AdminParametersPage() {
         </Section>
 
         <Section title="Zelle" description="Only offered to investors with a US (+1) phone number. Admins confirm Zelle payments manually.">
-          <Toggle checked={form.payment.zelle.enabled} onChange={(v) => set('payment.zelle.enabled', v)} label="Accept Zelle payments" />
+          <Toggle disabled={!canManage} checked={form.payment.zelle.enabled} onChange={(v) => set('payment.zelle.enabled', v)} label="Accept Zelle payments" />
           <Field label="Recipient (email or phone registered with Zelle)" error={errors['payment.zelle.recipient']}>
             <Input size="lg" value={form.payment.zelle.recipient} onChange={(e) => set('payment.zelle.recipient', e.target.value)} />
           </Field>
@@ -256,15 +278,18 @@ export default function AdminParametersPage() {
                 <span className="flex size-24 items-center justify-center rounded-lg border border-dashed text-caption text-subtle">No QR</span>
               )}
               <input ref={qrInput} type="file" accept="image/png,image/jpeg,image/webp" className="sr-only" onChange={uploadQr} />
+{canManage && (
               <Button type="button" variant="outline" onClick={() => qrInput.current?.click()} disabled={uploading}>
                 {uploading ? <Spinner /> : <ImageUpIcon />}
                 {meta?.hasQr ? 'Replace QR' : 'Upload QR'}
               </Button>
+)}
             </div>
             <span className="block text-caption text-muted-foreground">Export the QR from your bank’s Zelle screen (PNG/JPG, max 2 MB).</span>
           </div>
         </Section>
       </div>
+      </fieldset>
     </form>
   )
 }

@@ -2,10 +2,11 @@ import path from 'path'
 import env from '../config/env.js'
 import Order, { ORDER_STATUS } from '../models/Order.js'
 import { getSettings } from '../models/Setting.js'
-import { getBalanceCents } from '../models/WalletTransaction.js'
+import { getBalanceCents, getPendingCents } from '../models/WalletTransaction.js'
 import ApiError from '../utils/ApiError.js'
 import { fromCents, toCents } from '../utils/money.js'
-import { checkBep20Order, nextOrderCode } from '../services/order.service.js'
+import { auditChainPayment, checkBep20Order, completeOrder, nextOrderCode } from '../services/order.service.js'
+import { notifyPaymentNeedsReview } from '../services/telegram.service.js'
 
 // Zelle is only offered to US (+1) phone numbers
 const canUseZelle = (user) => user.phone?.startsWith('+1')
@@ -58,23 +59,36 @@ export async function getTradeConfig(req, res) {
     shares: sharesDto(settings),
     minPurchase: { amount: fromCents(minCents), firstPurchase },
     paymentMethods: {
-      bep20: bep20.enabled && bep20.address ? { network: 'BNB Smart Chain (BEP20)', token: 'USDT', address: bep20.address } : null,
+      bep20:
+        bep20.enabled && bep20.address
+          ? {
+              network: 'BNB Smart Chain (BEP20)',
+              token: 'USDT',
+              address: bep20.address,
+              // What the browser wallet needs to send the transfer itself
+              chainId: 56,
+              contract: env.bsc.usdtContract,
+              decimals: 18,
+            }
+          : null,
       zelle:
         zelle.enabled && zelle.recipient && canUseZelle(req.user)
           ? { recipientName: zelle.recipientName, recipient: zelle.recipient, hasQr: !!zelle.qrImage }
           : null,
     },
     balance: fromCents(await getBalanceCents(req.user._id)),
+    pendingBalance: fromCents(await getPendingCents(req.user._id)),
   })
 }
 
 /** Holdings + recent orders for the dashboard. */
 export async function getPortfolio(req, res) {
-  const [settings, completed, recent, balanceCents] = await Promise.all([
+  const [settings, completed, recent, balanceCents, pendingCents] = await Promise.all([
     getSettings(),
     Order.find({ user: req.user._id, status: ORDER_STATUS.COMPLETED }).sort({ completedAt: 1 }),
     Order.find({ user: req.user._id }).sort({ createdAt: -1 }).limit(5),
     getBalanceCents(req.user._id),
+    getPendingCents(req.user._id),
   ])
 
   const holdings = Object.fromEntries(['A', 'B'].map((t) => [t, { shares: 0, investedCents: 0 }]))
@@ -86,6 +100,7 @@ export async function getPortfolio(req, res) {
 
   res.json({
     balance: fromCents(balanceCents),
+    pendingBalance: fromCents(pendingCents),
     shares: sharesDto(settings).map((s) => ({
       ...s,
       quantity: holdings[s.type].shares,
@@ -145,9 +160,7 @@ export async function getMyOrder(req, res) {
 
 export async function submitPayment(req, res) {
   const order = await findMyOrder(req)
-  // A BEP20 payment the system couldn't verify can be resubmitted with the correct tx hash
-  const retryBep20 = order.status === ORDER_STATUS.PENDING_REVIEW && order.paymentMethod === 'bep20'
-  if (order.status !== ORDER_STATUS.AWAITING_PAYMENT && !retryBep20) {
+  if (order.status !== ORDER_STATUS.AWAITING_PAYMENT && order.status !== ORDER_STATUS.PAYING) {
     throw new ApiError(409, 'Payment for this order has already been submitted', undefined, 'ORDER_NOT_PAYABLE')
   }
 
@@ -161,17 +174,16 @@ export async function submitPayment(req, res) {
     }
     order.paymentMethod = 'bep20'
     order.txHash = req.body.txHash
-    order.status = ORDER_STATUS.VERIFYING
     order.paymentError = undefined
     order.paidAt = new Date()
     await order.save()
 
-    try {
-      await checkBep20Order(order)
-    } catch (err) {
-      // RPC hiccup: the background watcher will retry
-      console.error(`BEP20 check failed for ${order.orderCode}:`, err.message)
-    }
+    // The customer's wallet sent the transfer, so the order completes right now — no waiting on the chain.
+    // The background audit only alerts the admins if the transfer turns out not to exist or not to match.
+    const completed = await completeOrder(order._id)
+    if (!completed) throw new ApiError(409, 'Payment for this order has already been submitted', undefined, 'ORDER_NOT_PAYABLE')
+    await Order.updateOne({ _id: order._id }, { chainCheck: { state: 'pending', checkedAt: new Date() } })
+    auditChainPayment(order._id).catch((err) => console.error(`Chain audit failed for ${order.orderCode}:`, err.message))
   } else {
     if (!settings.payment.zelle.enabled || !canUseZelle(req.user)) throw new ApiError(400, 'Zelle is not available for your account')
     order.paymentMethod = 'zelle'
@@ -179,6 +191,8 @@ export async function submitPayment(req, res) {
     order.status = ORDER_STATUS.PENDING_REVIEW
     order.paidAt = new Date()
     await order.save()
+    // Ping the admins' Telegram so someone checks the Zelle transfer and approves the order
+    notifyPaymentNeedsReview(order, req.user, { method: 'zelle', reference: order.zelleReference })
   }
 
   res.json({ order: toOrderDto(await Order.findById(order._id)) })
@@ -193,9 +207,22 @@ export async function refreshPayment(req, res) {
   res.json({ order: toOrderDto(await Order.findById(order._id)) })
 }
 
+/** The customer chose USDT and is about to pay from their wallet: the order moves to "paying". */
+export async function startPayment(req, res) {
+  const settings = await getSettings()
+  if (!settings.payment.bep20.enabled || !settings.payment.bep20.address) throw new ApiError(400, 'USDT payment is not available')
+  const order = await Order.findOneAndUpdate(
+    { _id: req.params.id, user: req.user._id, status: { $in: [ORDER_STATUS.AWAITING_PAYMENT, ORDER_STATUS.PAYING] } },
+    { status: ORDER_STATUS.PAYING, paymentMethod: 'bep20' },
+    { new: true },
+  )
+  if (!order) throw new ApiError(409, 'This order can no longer be paid', undefined, 'ORDER_NOT_PAYABLE')
+  res.json({ order: toOrderDto(order) })
+}
+
 export async function cancelOrder(req, res) {
   const order = await Order.findOneAndUpdate(
-    { _id: req.params.id, user: req.user._id, status: ORDER_STATUS.AWAITING_PAYMENT },
+    { _id: req.params.id, user: req.user._id, status: { $in: [ORDER_STATUS.AWAITING_PAYMENT, ORDER_STATUS.PAYING] } },
     { status: ORDER_STATUS.CANCELLED },
     { new: true },
   )

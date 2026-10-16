@@ -16,6 +16,11 @@ const settingSchema = new mongoose.Schema(
         priceCents: { type: Number, default: 200 },
       },
     },
+    // Shares available for sale per class (set in the database; used by the admin overview)
+    allocation: {
+      A: { type: Number, default: 1_000_000, min: 0 },
+      B: { type: Number, default: 1_000_000, min: 0 },
+    },
     // % of a completed purchase paid to the buyer's direct referrer (F1), per class
     commissionPct: {
       A: { type: Number, default: 8, min: 0, max: 100 },

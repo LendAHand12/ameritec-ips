@@ -22,6 +22,15 @@ const env = {
   mail: {
     from: process.env.MAIL_FROM,
   },
+  withdrawal: {
+    // Smallest commission payout a user can request
+    minUsdt: Number(process.env.MIN_WITHDRAWAL_USDT ?? 10),
+  },
+  // Admin alerts (new payments to verify). Leave empty to disable.
+  telegram: {
+    botToken: process.env.TELEGRAM_BOT_TOKEN,
+    chatId: process.env.TELEGRAM_CHAT_ID,
+  },
   upload: {
     dir: process.env.UPLOAD_DIR ?? 'uploads',
     maxSizeMB: Number(process.env.UPLOAD_MAX_SIZE_MB ?? 10),

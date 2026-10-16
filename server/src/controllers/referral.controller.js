@@ -5,7 +5,11 @@ import User, { ACCOUNT_STATUS, USER_STATUS } from '../models/User.js'
 import WalletTransaction from '../models/WalletTransaction.js'
 import { toCsv } from '../utils/csv.js'
 import { fromCents } from '../utils/money.js'
-import { shortName } from '../utils/privacy.js'
+import env from '../config/env.js'
+import Withdrawal from '../models/Withdrawal.js'
+import { getWalletSummary } from '../models/WalletTransaction.js'
+import { toCents } from '../utils/money.js'
+import { assertSensitiveAuth, requestWithdrawal } from '../services/withdrawal.service.js'
 
 const MAX_LEVELS = 3 // network is shown down to F3; commission is paid on F1 only
 const MAX_MEMBERS = 5000
@@ -17,7 +21,7 @@ async function loadNetwork(rootId) {
   const members = []
   let parents = [rootId]
   for (let level = 1; level <= MAX_LEVELS && parents.length && members.length < MAX_MEMBERS; level++) {
-    const rows = await User.find({ referredBy: { $in: parents }, emailVerified: true })
+    const rows = await User.find({ referredBy: { $in: parents }, emailVerified: true, deletedAt: null })
       .select('fullName referredBy createdAt status accountStatus')
       .sort({ createdAt: -1 })
       .limit(MAX_MEMBERS - members.length)
@@ -33,16 +37,17 @@ async function loadNetwork(rootId) {
   return members.map((m) => ({
     id: String(m._id),
     parentId: String(m.referredBy),
-    name: shortName(m.fullName),
+    name: m.fullName,
     level: m.level,
     joinedAt: m.createdAt,
     active: m.status === USER_STATUS.APPROVED && m.accountStatus === ACCOUNT_STATUS.ACTIVE && buyers.has(String(m._id)),
   }))
 }
 
-const commissionFilter = (userId, { q, days }) => ({
+const commissionFilter = (userId, { q, days, status }) => ({
   user: new mongoose.Types.ObjectId(String(userId)),
   type: 'referral_commission',
+  ...(status && { status }),
   ...(days && { createdAt: { $gte: new Date(Date.now() - days * DAY) } }),
 })
 
@@ -53,7 +58,7 @@ async function findCommissions(userId, filters, { skip = 0, limit = 10_000 } = {
     { $sort: { createdAt: -1 } },
     { $lookup: { from: 'orders', localField: 'order', foreignField: '_id', as: 'order' } },
     { $unwind: '$order' },
-    { $lookup: { from: 'users', localField: 'fromUser', foreignField: '_id', as: 'fromUser', pipeline: [{ $project: { fullName: 1 } }] } },
+    { $lookup: { from: 'users', localField: 'fromUser', foreignField: '_id', as: 'fromUser', pipeline: [{ $project: { fullName: 1, status: 1, faceVerified: 1 } }] } },
     { $unwind: { path: '$fromUser', preserveNullAndEmptyArrays: true } },
   ]
   if (filters.q) pipeline.push({ $match: { 'order.orderCode': { $regex: filters.q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), $options: 'i' } } })
@@ -66,8 +71,12 @@ async function findCommissions(userId, filters, { skip = 0, limit = 10_000 } = {
     total: result.total[0]?.n ?? 0,
     items: result.items.map((t) => ({
       id: String(t._id),
+      status: t.status ?? 'available',
       date: t.createdAt,
-      member: shortName(t.fromUser?.fullName),
+      member: t.fromUser?.fullName ?? 'Member',
+      // A pending commission waits for the buyer to finish KYC and, if needed, get their face scan approved
+      pendingReason:
+        (t.status ?? 'available') !== 'pending' ? null : t.fromUser?.status !== 'approved' ? 'buyer_kyc' : t.needsBuyerFace && !t.fromUser?.faceVerified ? 'buyer_face' : 'buyer_kyc',
       orderCode: t.order.orderCode,
       level: 1,
       ratePct: t.commissionPct,
@@ -80,18 +89,19 @@ async function findCommissions(userId, filters, { skip = 0, limit = 10_000 } = {
 
 export async function getSummary(req, res) {
   const userId = req.user._id
-  const [network, settings, commission, f1Orders] = await Promise.all([
+  const [network, settings, commission, f1Orders, wallet] = await Promise.all([
     loadNetwork(userId),
     getSettings(),
     WalletTransaction.aggregate([
       { $match: { user: userId, type: 'referral_commission' } },
-      { $group: { _id: null, cents: { $sum: '$amountCents' }, count: { $sum: 1 } } },
+      { $group: { _id: '$status', cents: { $sum: '$amountCents' }, count: { $sum: 1 } } },
     ]),
     // Shares bought by direct referrals (the purchases that earned commission)
     Order.aggregate([
-      { $match: { status: ORDER_STATUS.COMPLETED, user: { $in: await User.find({ referredBy: userId }).distinct('_id') } } },
+      { $match: { status: ORDER_STATUS.COMPLETED, user: { $in: await User.find({ referredBy: userId, deletedAt: null }).distinct('_id') } } },
       { $group: { _id: '$shareType', shares: { $sum: '$shares' } } },
     ]),
+    getWalletSummary(userId),
   ])
 
   const monthStart = new Date(new Date().getFullYear(), new Date().getMonth(), 1)
@@ -107,8 +117,13 @@ export async function getSummary(req, res) {
       levels: { f1: byLevel[0], f2: byLevel[1], f3: byLevel[2] },
     },
     commission: {
-      total: fromCents(commission[0]?.cents ?? 0),
-      count: commission[0]?.count ?? 0,
+      // earned = everything credited; only "available" can be withdrawn, "pending" waits for KYC approval
+      total: fromCents(wallet.earnedCents),
+      available: fromCents(wallet.availableCents),
+      pending: fromCents(wallet.pendingCents),
+      requested: fromCents(wallet.requestedCents),
+      withdrawn: fromCents(wallet.withdrawnCents),
+      count: commission.reduce((s, c) => s + c.count, 0),
       ratePct: { A: settings.commissionPct.A, B: settings.commissionPct.B },
     },
     referralShares: { A: shares.A ?? 0, B: shares.B ?? 0, total: (shares.A ?? 0) + (shares.B ?? 0) },
@@ -176,4 +191,63 @@ export async function getCommissionChart(req, res) {
     total: fromCents(totalCents),
     changePct: previousCents ? ((totalCents - previousCents) / previousCents) * 100 : null,
   })
+}
+
+// ---- Commission wallet & withdrawals ----
+
+const toWithdrawalDto = (w) => ({
+  id: w.id,
+  code: w.code,
+  amount: fromCents(w.amountCents),
+  address: w.address,
+  status: w.status,
+  txHash: w.txHash ?? null,
+  rejectionReason: w.rejectionReason ?? null,
+  createdAt: w.createdAt,
+  processedAt: w.processedAt ?? null,
+})
+
+/** Balances (withdrawable / pending KYC / requested / paid), the saved wallet and the latest withdrawals. */
+export async function getWallet(req, res) {
+  const [wallet, recent] = await Promise.all([getWalletSummary(req.user._id), Withdrawal.find({ user: req.user._id }).sort({ createdAt: -1 }).limit(5)])
+  res.json({
+    balance: {
+      available: fromCents(wallet.availableCents),
+      pending: fromCents(wallet.pendingCents),
+      requested: fromCents(wallet.requestedCents),
+      withdrawn: fromCents(wallet.withdrawnCents),
+      earned: fromCents(wallet.earnedCents),
+    },
+    address: req.user.withdrawalWallet?.address ?? null,
+    network: 'BNB Smart Chain (BEP20)',
+    token: 'USDT',
+    minWithdrawal: env.withdrawal.minUsdt,
+    withdrawals: recent.map(toWithdrawalDto),
+  })
+}
+
+/** Saves where withdrawals are paid. Needs a fresh authenticator code. */
+export async function setWallet(req, res) {
+  await assertSensitiveAuth(req.user._id, req.body)
+  const user = await User.findById(req.user._id)
+  user.withdrawalWallet = { address: req.body.address, updatedAt: new Date() }
+  await user.save()
+  res.json({ address: user.withdrawalWallet.address })
+}
+
+export async function createWithdrawal(req, res) {
+  await assertSensitiveAuth(req.user._id, req.body)
+  const user = await User.findById(req.user._id)
+  const withdrawal = await requestWithdrawal(user, toCents(req.body.amount))
+  res.status(201).json({ withdrawal: toWithdrawalDto(withdrawal) })
+}
+
+export async function listWithdrawals(req, res) {
+  const { page, limit } = req.validatedQuery
+  const filter = { user: req.user._id }
+  const [items, total] = await Promise.all([
+    Withdrawal.find(filter).sort({ createdAt: -1 }).skip((page - 1) * limit).limit(limit),
+    Withdrawal.countDocuments(filter),
+  ])
+  res.json({ data: items.map(toWithdrawalDto), pagination: { page, limit, total, totalPages: Math.ceil(total / limit) } })
 }

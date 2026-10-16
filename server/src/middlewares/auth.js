@@ -10,14 +10,28 @@ export async function protect(req, res, next) {
   const token = req.cookies?.[SESSION_COOKIE]
   if (!token) throw new ApiError(401, 'Not authenticated', undefined, 'UNAUTHENTICATED')
 
-  const { sub } = verifyToken(token, TOKEN_PURPOSE.SESSION, { code: 'UNAUTHENTICATED', message: 'Session expired' })
+  const { sub, iat } = verifyToken(token, TOKEN_PURPOSE.SESSION, { code: 'UNAUTHENTICATED', message: 'Session expired' })
   const user = await User.findById(sub)
-  if (!user || !user.emailVerified || user.status !== USER_STATUS.APPROVED || user.accountStatus === ACCOUNT_STATUS.LOCKED) {
+  // A password reset invalidates every session issued before it
+  const invalidatedAt = Math.max(user?.passwordChangedAt?.getTime() ?? 0, user?.sessionsRevokedAt?.getTime() ?? 0)
+  const passwordChanged = invalidatedAt && iat < Math.floor(invalidatedAt / 1000)
+  if (!user || user.deletedAt || passwordChanged || !user.emailVerified || user.status !== USER_STATUS.APPROVED || user.accountStatus === ACCOUNT_STATUS.LOCKED) {
     res.clearCookie(SESSION_COOKIE)
     throw new ApiError(401, 'Not authenticated', undefined, 'UNAUTHENTICATED')
   }
 
   req.user = user
+  next()
+}
+
+/** Route guard (after protectAdmin): super admins pass, sub admins need the permission. */
+export const requirePermission = (permission) => (req, res, next) => {
+  if (!req.admin.can(permission)) throw new ApiError(403, 'You do not have permission to do this', undefined, 'FORBIDDEN')
+  next()
+}
+
+export function requireSuperAdmin(req, res, next) {
+  if (!req.admin.isSuperAdmin()) throw new ApiError(403, 'Only a super admin can manage admin accounts', undefined, 'FORBIDDEN')
   next()
 }
 

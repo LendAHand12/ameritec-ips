@@ -12,7 +12,7 @@ const th = 'border-y border-divider bg-muted px-[15px] py-[12.5px] text-left tex
 const td = 'border-b border-divider px-[15px] py-[16.25px] text-caption whitespace-nowrap text-muted-foreground'
 
 function RowActions({ order }) {
-  const needsPayment = order.status === 'awaiting_payment'
+  const needsPayment = order.status === 'awaiting_payment' || order.status === 'paying'
   return (
     <DropdownMenu>
       <DropdownMenuTrigger render={<Button variant="ghost" size="icon-sm" aria-label={`Actions for ${order.orderCode}`} />}>

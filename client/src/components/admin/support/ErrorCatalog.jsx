@@ -3,6 +3,7 @@ import { PlusIcon, SearchIcon } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Spinner } from '@/components/ui/spinner'
 import FilterSelect from '@/components/admin/FilterSelect'
+import { useAdminAuth } from '@/hooks/useAdminAuth'
 import StatusBadge from '@/components/dashboard/StatusBadge'
 import { useAsync } from '@/hooks/useAsync'
 import { useDebounced } from '@/hooks/useDebounced'
@@ -22,6 +23,8 @@ const selectClass = 'h-[42.5px] w-full rounded-lg bg-card text-caption text-fore
 
 /** Help articles investors see in "Find a Solution". */
 export default function ErrorCatalog() {
+  const { can } = useAdminAuth()
+  const canManage = can('support:manage')
   const [search, setSearch] = useState('')
   const [category, setCategory] = useState('')
   const [published, setPublished] = useState('')
@@ -65,10 +68,12 @@ export default function ErrorCatalog() {
           onChange={setPublished}
           className={selectClass}
         />
+{canManage && (
         <Button className="h-[42.5px] px-[17.5px] font-bold shadow-brand sm:col-span-2 lg:col-span-1" onClick={() => setEditing(null)}>
           <PlusIcon />
           New Article
         </Button>
+)}
       </div>
 
       <section className="overflow-hidden rounded-xl border bg-card shadow-[0_1.25px_2.5px_rgb(0_0_0/0.04)]">
@@ -106,9 +111,11 @@ export default function ErrorCatalog() {
                   </td>
                   <td className={`${td} whitespace-nowrap text-muted-foreground`}>{formatDate(a.updatedAt)}</td>
                   <td className={td}>
+{canManage && (
                     <Button variant="outline" className="h-[35px] rounded-lg bg-card px-2.5 text-title font-bold" onClick={() => setEditing(a)}>
                       Edit
                     </Button>
+)}
                   </td>
                 </tr>
               ))}

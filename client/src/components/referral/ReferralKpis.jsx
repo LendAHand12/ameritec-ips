@@ -19,7 +19,15 @@ export default function ReferralKpis({ summary }) {
         value={formatUsdt(commission.total)}
         unit="USDT"
         icon={<KpiIcon icon={WalletIcon} />}
-        footer={`${formatClassRates(commission.ratePct)} of your direct referrals’ purchases · credited to your balance`}
+        footer={
+          commission.pending > 0 ? (
+            <span className="font-semibold text-warning">
+              {formatUsdt(commission.pending)} USDT pending — released once your referrals finish verification
+            </span>
+          ) : (
+            `${formatClassRates(commission.ratePct)} of your direct referrals’ purchases · credited to your balance`
+          )
+        }
       />
       <KpiCard
         label="Shares Bought by Your Referrals"

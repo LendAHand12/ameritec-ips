@@ -32,7 +32,17 @@ export default function AdminAuthProvider({ children }) {
     return () => window.removeEventListener(ADMIN_UNAUTHORIZED_EVENT, onUnauthorized)
   }, [refresh])
 
-  const value = useMemo(() => ({ admin, setAdmin, loading, refresh, logout }), [admin, loading, refresh, logout])
+  /** "manage" on a module includes "view". */
+  const can = useCallback(
+    (permission) => {
+      const granted = admin?.permissions ?? []
+      const [module, level] = permission.split(':')
+      return granted.includes(permission) || (level === 'view' && granted.includes(`${module}:manage`))
+    },
+    [admin],
+  )
+
+  const value = useMemo(() => ({ admin, setAdmin, loading, refresh, logout, can }), [admin, loading, refresh, logout, can])
 
   return <AdminAuthContext.Provider value={value}>{children ?? <Outlet />}</AdminAuthContext.Provider>
 }

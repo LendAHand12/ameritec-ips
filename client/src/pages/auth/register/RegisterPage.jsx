@@ -117,7 +117,7 @@ export default function RegisterPage() {
               }}
             />
           )}
-          {step === STEP_INDEX.face && <StepFaceId onBack={back} onNext={(face) => update({ face }, STEP_INDEX.twoFactor)} />}
+          {step === STEP_INDEX.face && <StepFaceId value={data.face} onBack={back} onNext={(face) => update({ face }, STEP_INDEX.twoFactor)} />}
           {step === STEP_INDEX.twoFactor && (
             <StepTwoFactor
               email={data.account.email}

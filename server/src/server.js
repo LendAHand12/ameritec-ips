@@ -3,6 +3,7 @@ import env from './config/env.js'
 import { connectDB } from './config/db.js'
 import mailer from './config/mailer.js'
 import { migrateSettings } from './models/Setting.js'
+import { migrateWallet } from './services/commission.service.js'
 import { seedSupportArticles } from './models/SupportArticle.js'
 import { startBep20Watcher } from './services/order.service.js'
 
@@ -10,6 +11,7 @@ async function start() {
   try {
     await connectDB()
     await migrateSettings()
+    await migrateWallet()
     await seedSupportArticles()
     app.listen(env.port, () => console.log(`Server running at http://localhost:${env.port}`))
     startBep20Watcher()

@@ -5,6 +5,24 @@ export const adminLogin = (data) => api.post('/admin/auth/login', data)
 export const adminLogout = () => api.post('/admin/auth/logout')
 export const getAdminMe = () => api.get('/admin/auth/me')
 
+// Admin accounts & permissions
+export const getAdminAccountsMeta = () => api.get('/admin/admins/meta')
+export const listAdminAccounts = () => api.get('/admin/admins')
+export const createAdminAccount = (data) => api.post('/admin/admins', data)
+export const updateAdminAccount = (id, data) => api.patch(`/admin/admins/${id}`, data)
+export const resetAdminAccountPassword = (id, password) => api.patch(`/admin/admins/${id}/password`, { password })
+
+// Referral & commission
+export const getReferralSummary = (params) => api.get('/admin/referrals/summary', { params })
+export const listReferralCommissions = (params) => api.get('/admin/referrals/commissions', { params })
+export const listReferrers = (params) => api.get('/admin/referrals/referrers', { params })
+export const listWithdrawals = (params) => api.get('/admin/referrals/withdrawals', { params })
+export const markWithdrawalPaid = (id, txHash) => api.patch(`/admin/referrals/withdrawals/${id}/paid`, { txHash })
+export const rejectWithdrawal = (id, reason) => api.patch(`/admin/referrals/withdrawals/${id}/reject`, { reason })
+
+// Overview
+export const getOverview = (params) => api.get('/admin/overview', { params })
+
 // Users & KYC
 export const listUsers = (params) => api.get('/admin/users', { params })
 export const getUserStats = () => api.get('/admin/users/stats')
@@ -13,6 +31,11 @@ export const approveUser = (id) => api.patch(`/admin/users/${id}/approve`)
 export const rejectUser = (id, reason) => api.patch(`/admin/users/${id}/reject`, { reason })
 export const lockUser = (id, reason) => api.patch(`/admin/users/${id}/lock`, { reason })
 export const unlockUser = (id) => api.patch(`/admin/users/${id}/unlock`)
+export const approveFace = (id) => api.patch(`/admin/users/${id}/face/approve`)
+export const rejectFace = (id, reason) => api.patch(`/admin/users/${id}/face/reject`, { reason })
+export const verifyUserEmail = (id) => api.patch(`/admin/users/${id}/verify-email`)
+export const changeUserReferrer = (id, referralCode) => api.patch(`/admin/users/${id}/referrer`, { referralCode })
+export const deleteUser = (id, reason) => api.delete(`/admin/users/${id}`, { data: { reason } })
 export const identityImageUrl = (id, side) => `${import.meta.env.VITE_API_URL ?? ''}/api/admin/users/${id}/identity/${side}`
 
 /** Downloads the CSV for the given filters (or the selected ids). */

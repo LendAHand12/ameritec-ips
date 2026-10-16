@@ -3,6 +3,7 @@ import mongoose from 'mongoose'
 export const AUDIT_CATEGORIES = {
   users: 'Users & KYC',
   transactions: 'Transactions',
+  referrals: 'Referral & Commission',
   parameters: 'Operational Parameters',
   support: 'Support',
   security: 'Security',
@@ -16,6 +17,7 @@ export const AUDIT_RECORD_TYPES = {
   ticket: 'Support Ticket',
   article: 'Help Article',
   admin: 'Admin Account',
+  withdrawal: 'Withdrawal',
 }
 
 /** Every admin action, by key. Category drives the dashboard counters. */
@@ -27,6 +29,11 @@ export const AUDIT_ACTIONS = {
   'user.reject': { category: 'users', label: 'Rejected KYC' },
   'user.lock': { category: 'users', label: 'Locked Account' },
   'user.unlock': { category: 'users', label: 'Unlocked Account' },
+  'user.verify_email': { category: 'users', label: 'Verified Email Manually' },
+  'user.face_approve': { category: 'users', label: 'Approved Face Scan' },
+  'user.face_reject': { category: 'users', label: 'Rejected Face Scan' },
+  'user.change_referrer': { category: 'users', label: 'Changed Referrer' },
+  'user.delete': { category: 'users', label: 'Deleted User' },
   'order.approve': { category: 'transactions', label: 'Approved Payment' },
   'order.reject': { category: 'transactions', label: 'Rejected Payment' },
   'order.certificate_upload': { category: 'transactions', label: 'Uploaded Certificate' },
@@ -39,6 +46,11 @@ export const AUDIT_ACTIONS = {
   'article.create': { category: 'support', label: 'Created Help Article' },
   'article.update': { category: 'support', label: 'Updated Help Article' },
   'article.delete': { category: 'support', label: 'Deleted Help Article' },
+  'admin.create': { category: 'security', label: 'Created Admin Account' },
+  'admin.update': { category: 'security', label: 'Updated Admin Account' },
+  'admin.password_reset': { category: 'security', label: 'Reset Admin Password' },
+  'withdrawal.paid': { category: 'referrals', label: 'Marked Withdrawal Paid' },
+  'withdrawal.reject': { category: 'referrals', label: 'Rejected Withdrawal' },
   'admin.request': { category: 'other', label: 'Other Admin Action' },
 }
 
