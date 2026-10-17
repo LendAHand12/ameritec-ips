@@ -86,8 +86,8 @@ export default function StepReview({ data, onEdit, onBack, onSubmit, submitting 
 
       <Section title="Security">
         <dl className="space-y-2">
-          <Row label="Face ID">
-            <Badge variant="secondary">After approval</Badge>
+          <Row label="Face scan">
+            <Badge variant="secondary">Right after email verification — optional</Badge>
           </Row>
           <Row label="Two-factor auth">
             <Badge variant={twoFactor ? 'default' : 'secondary'}>{twoFactor ? 'Enabled' : 'Skipped — optional'}</Badge>

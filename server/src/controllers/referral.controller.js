@@ -74,9 +74,8 @@ async function findCommissions(userId, filters, { skip = 0, limit = 10_000 } = {
       status: t.status ?? 'available',
       date: t.createdAt,
       member: t.fromUser?.fullName ?? 'Member',
-      // A pending commission waits for the buyer to finish KYC and, if needed, get their face scan approved
-      pendingReason:
-        (t.status ?? 'available') !== 'pending' ? null : t.fromUser?.status !== 'approved' ? 'buyer_kyc' : t.needsBuyerFace && !t.fromUser?.faceVerified ? 'buyer_face' : 'buyer_kyc',
+      // A pending commission waits for the buyer's face scan to be approved
+      pendingReason: (t.status ?? 'available') !== 'pending' ? null : 'buyer_face',
       orderCode: t.order.orderCode,
       level: 1,
       ratePct: t.commissionPct,
@@ -117,7 +116,7 @@ export async function getSummary(req, res) {
       levels: { f1: byLevel[0], f2: byLevel[1], f3: byLevel[2] },
     },
     commission: {
-      // earned = everything credited; only "available" can be withdrawn, "pending" waits for KYC approval
+      // earned = everything credited; only "available" can be withdrawn, "pending" waits for the buyer's face scan
       total: fromCents(wallet.earnedCents),
       available: fromCents(wallet.availableCents),
       pending: fromCents(wallet.pendingCents),
@@ -207,7 +206,7 @@ const toWithdrawalDto = (w) => ({
   processedAt: w.processedAt ?? null,
 })
 
-/** Balances (withdrawable / pending KYC / requested / paid), the saved wallet and the latest withdrawals. */
+/** Balances (withdrawable / held for referrals' face scans / requested / paid), whether the user may withdraw, the saved wallet and the latest withdrawals. */
 export async function getWallet(req, res) {
   const [wallet, recent] = await Promise.all([getWalletSummary(req.user._id), Withdrawal.find({ user: req.user._id }).sort({ createdAt: -1 }).limit(5)])
   res.json({
@@ -219,6 +218,9 @@ export async function getWallet(req, res) {
       earned: fromCents(wallet.earnedCents),
     },
     address: req.user.withdrawalWallet?.address ?? null,
+    // Withdrawing needs the user's own face scan approved by an admin
+    canWithdraw: !!req.user.faceVerified,
+    faceStatus: req.user.faceVerified ? 'approved' : (req.user.face?.status ?? 'none'),
     network: 'BNB Smart Chain (BEP20)',
     token: 'USDT',
     minWithdrawal: env.withdrawal.minUsdt,

@@ -15,7 +15,8 @@ export async function protect(req, res, next) {
   // A password reset invalidates every session issued before it
   const invalidatedAt = Math.max(user?.passwordChangedAt?.getTime() ?? 0, user?.sessionsRevokedAt?.getTime() ?? 0)
   const passwordChanged = invalidatedAt && iat < Math.floor(invalidatedAt / 1000)
-  if (!user || user.deletedAt || passwordChanged || !user.emailVerified || user.status !== USER_STATUS.APPROVED || user.accountStatus === ACCOUNT_STATUS.LOCKED) {
+  // No admin approval needed to sign in: the face scan review only gates commission withdrawals
+  if (!user || user.deletedAt || passwordChanged || !user.emailVerified || user.status === USER_STATUS.REJECTED || user.accountStatus === ACCOUNT_STATUS.LOCKED) {
     res.clearCookie(SESSION_COOKIE)
     throw new ApiError(401, 'Not authenticated', undefined, 'UNAUTHENTICATED')
   }

@@ -35,7 +35,7 @@ import { getOrderStats, getSupportStats, getUserStats } from '@/services/admin.s
 
 const ADMIN_NAV = [
   { to: '/admin', label: 'Overview', icon: LayoutGridIcon, end: true, perm: 'overview:view' },
-  { to: '/admin/users', label: 'Users & KYC', icon: UsersIcon, badge: 'pending', perm: 'users:view' },
+  { to: '/admin/users', label: 'Users & KYC', icon: UsersIcon, badge: 'facePending', perm: 'users:view' },
   { to: '/admin/transactions', label: 'Transactions', icon: ArrowRightLeftIcon, badge: 'ordersPending', perm: 'orders:view' },
   { to: '/admin/shares', label: 'Shares', icon: TrendingUpIcon },
   { to: '/admin/referrals', label: 'Referral & Commission', icon: UsersIcon, perm: 'referrals:view' },

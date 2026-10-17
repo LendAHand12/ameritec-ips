@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { Link } from 'react-router-dom'
 import {
   ArrowUpRightIcon,
   BanknoteIcon,
@@ -11,10 +12,11 @@ import {
   InfoIcon,
   PencilIcon,
   PlusIcon,
+  ScanFaceIcon,
   WalletIcon,
 } from 'lucide-react'
 import { toast } from 'sonner'
-import { Button } from '@/components/ui/button'
+import { Button, buttonVariants } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Spinner } from '@/components/ui/spinner'
@@ -222,7 +224,7 @@ function WithdrawDialog({ open, wallet, onClose, onDone }) {
   )
 }
 
-/** Which referrals are holding commission back (their purchase is fine, but they haven't finished KYC). */
+/** Which referrals are holding commission back (their purchase is fine, but their face scan isn't approved yet). */
 function PendingList() {
   const { data } = useAsync(() => listCommissions({ status: 'pending', limit: 5 }), [])
   if (!data) return <Spinner className="mx-auto my-3 size-4 text-muted-foreground" />
@@ -234,7 +236,7 @@ function PendingList() {
             <span className="font-semibold">{c.member}</span>
             <span className="text-muted-foreground">
               {' '}
-              · {c.orderCode} · {c.pendingReason === 'buyer_face' ? 'waiting for their face scan to be approved' : 'waiting for them to complete KYC'}
+              · {c.orderCode} · waiting for their face scan to be approved
             </span>
           </span>
           <span className="font-bold text-warning tabular-nums">+{formatUsdt(c.amount)} USDT</span>
@@ -247,7 +249,7 @@ function PendingList() {
   )
 }
 
-/** "Commission wallet": withdrawable vs waiting-for-KYC balances, the payout wallet and recent withdrawals. */
+/** "Commission wallet": withdrawable vs held balances, the payout wallet and recent withdrawals. */
 export default function CommissionWallet({ onChanged }) {
   const [reloadKey, setReloadKey] = useState(0)
   const { data: wallet } = useAsync(getWallet, [reloadKey])
@@ -268,7 +270,14 @@ export default function CommissionWallet({ onChanged }) {
     )
   }
   const { balance } = wallet
-  const canWithdraw = !!wallet.address && balance.available >= wallet.minWithdrawal
+  // Withdrawing needs the user's own approved face scan; everything else (buying, viewing) works without it
+  const faceReady = wallet.canWithdraw !== false
+  const canWithdraw = faceReady && !!wallet.address && balance.available >= wallet.minWithdrawal
+  const withdrawHint = !faceReady
+    ? 'Your face scan must be approved before you can withdraw'
+    : wallet.address && !canWithdraw
+      ? `Minimum withdrawal is ${formatUsdt(wallet.minWithdrawal)} USDT`
+      : undefined
 
   return (
     <Panel className="space-y-5">
@@ -280,8 +289,8 @@ export default function CommissionWallet({ onChanged }) {
             size="lg"
             className="font-bold shadow-brand"
             onClick={() => (wallet.address ? setDialog('withdraw') : setDialog('wallet'))}
-            disabled={!!wallet.address && !canWithdraw}
-            title={wallet.address && !canWithdraw ? `Minimum withdrawal is ${formatUsdt(wallet.minWithdrawal)} USDT` : undefined}
+            disabled={!faceReady || (!!wallet.address && !canWithdraw)}
+            title={withdrawHint}
           >
             <ArrowUpRightIcon />
             Withdraw
@@ -296,7 +305,7 @@ export default function CommissionWallet({ onChanged }) {
           tone="warning"
           label="Pending — waiting for verification"
           value={formatUsdt(balance.pending)}
-          note={balance.pending > 0 ? 'Released when your referrals finish verification' : 'Nothing waiting right now'}
+          note={balance.pending > 0 ? 'Released when your referrals’ face scans are approved' : 'Nothing waiting right now'}
         />
         <Stat
           icon={BanknoteIcon}
@@ -307,13 +316,30 @@ export default function CommissionWallet({ onChanged }) {
         />
       </div>
 
+      {!faceReady && (
+        <div className="flex flex-wrap items-center gap-3 rounded-lg border border-primary/20 bg-primary-soft/60 p-3.5">
+          <ScanFaceIcon className="size-[22px] shrink-0 text-primary" />
+          <p className="min-w-0 flex-1 text-caption">
+            <span className="font-bold">Withdrawals need an approved face scan.</span>{' '}
+            {wallet.faceStatus === 'pending'
+              ? 'Your face scan is waiting for review — you can withdraw as soon as it’s approved.'
+              : 'Your commission keeps adding up in the meantime. Scan your face once and, after an admin approves it, you can withdraw.'}
+          </p>
+          {wallet.faceStatus !== 'pending' && (
+            <Link to="/account?tab=identity" className={buttonVariants({ size: 'sm' })}>
+              {wallet.faceStatus === 'rejected' ? 'Scan again' : 'Scan my face'}
+            </Link>
+          )}
+        </div>
+      )}
+
       {balance.pending > 0 && (
         <div className="rounded-lg border border-warning/25 bg-warning-soft/60 p-3.5">
           <button type="button" onClick={() => setShowPending((v) => !v)} aria-expanded={showPending} className="flex w-full items-start gap-2.5 text-left">
             <InfoIcon className="mt-0.5 size-[18px] shrink-0 text-warning" />
             <span className="flex-1 text-caption text-[#75521d]">
               <span className="font-bold">{formatUsdt(balance.pending)} USDT is on hold.</span> Commission becomes withdrawable once the person who bought has
-              completed identity verification (KYC) and their face scan is approved. See who it’s waiting for.
+              their face scan approved. See who it’s waiting for.
             </span>
             <ChevronDownIcon className={cn('mt-0.5 size-4 shrink-0 text-warning transition-transform', showPending && 'rotate-180')} />
           </button>

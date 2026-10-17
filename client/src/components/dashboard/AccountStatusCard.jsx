@@ -28,7 +28,7 @@ export default function AccountStatusCard({ user }) {
   const rows = [
     checks[0],
     checks[1],
-    { label: 'Account Status', ok: user.status === 'approved', okText: 'Active', badText: 'Inactive' },
+    { label: 'Account Status', ok: user.accountStatus !== 'locked', okText: 'Active', badText: 'Locked' },
   ]
 
   return (

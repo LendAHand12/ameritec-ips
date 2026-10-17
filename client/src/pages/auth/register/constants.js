@@ -1,4 +1,4 @@
-import { ClipboardCheckIcon, KeyRoundIcon, ScanFaceIcon, ShieldCheckIcon, UsersIcon } from 'lucide-react'
+import { ClipboardCheckIcon, KeyRoundIcon, ShieldCheckIcon, UsersIcon } from 'lucide-react'
 
 export const STEPS = [
   {
@@ -14,13 +14,6 @@ export const STEPS = [
     icon: ShieldCheckIcon,
     title: 'Verify your identity',
     description: 'Provide the required documents to verify your identity.',
-  },
-  {
-    id: 'face',
-    label: 'Face Scan',
-    icon: ScanFaceIcon,
-    title: 'Face scan (optional)',
-    description: 'Done after your account is approved, from Account & Security.',
   },
   {
     id: 'twoFactor',

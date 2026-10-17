@@ -136,7 +136,7 @@ export default function StepIdentity({ value, serverErrors, onBack, onNext }) {
         </p>
       </div>
 
-      <StepActions onBack={() => onBack(identity)} onNext={handleNext} nextLabel="Continue to Face Scan" />
+      <StepActions onBack={() => onBack(identity)} onNext={handleNext} nextLabel="Continue to Secure Account" />
     </div>
   )
 }

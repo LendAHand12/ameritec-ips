@@ -10,7 +10,6 @@ import { ACCOUNT_FIELDS, STEPS, STEP_INDEX } from './constants'
 import Stepper from './Stepper'
 import StepAccountInfo from './StepAccountInfo'
 import StepIdentity from './StepIdentity'
-import StepFaceId from './StepFaceId'
 import StepTwoFactor from './StepTwoFactor'
 import StepReview from './StepReview'
 
@@ -37,7 +36,6 @@ export default function RegisterPage() {
     },
     referrer: null,
     identity: { documentType: 'national_id', front: null, back: null, supporting: null },
-    face: null,
     twoFactor: null,
   }))
 
@@ -113,11 +111,10 @@ export default function RegisterPage() {
               onBack={(identity) => update({ identity }, STEP_INDEX.account)}
               onNext={(identity) => {
                 setServerErrors(null)
-                update({ identity }, STEP_INDEX.face)
+                update({ identity }, STEP_INDEX.twoFactor)
               }}
             />
           )}
-          {step === STEP_INDEX.face && <StepFaceId value={data.face} onBack={back} onNext={(face) => update({ face }, STEP_INDEX.twoFactor)} />}
           {step === STEP_INDEX.twoFactor && (
             <StepTwoFactor
               email={data.account.email}

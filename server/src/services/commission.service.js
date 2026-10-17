@@ -1,30 +1,26 @@
 import WalletTransaction, { COMMISSION_STATUS } from '../models/WalletTransaction.js'
 import User, { USER_STATUS } from '../models/User.js'
 
-/** A commission becomes spendable only when both the earner and the buyer are KYC-approved (and not deleted). */
-export const isKycApproved = (user) => !!user && !user.deletedAt && user.status === USER_STATUS.APPROVED
-
 /** The user's face scan was reviewed and approved by an admin. */
 export const isFaceApproved = (user) => !!user?.faceVerified
 
+/** A commission is held until the buyer (the referrer's downline) has an admin-approved face scan. */
+export const commissionReleasable = (buyer) => !!buyer && !buyer.deletedAt && isFaceApproved(buyer)
+
 /**
- * Moves a user's pending commissions to available once everyone involved is approved.
- * Called when an admin approves a user — as the earner (their referrals' purchases) or as the buyer.
+ * Moves pending commissions to available once the buyer behind them has an approved face scan.
+ * Called when an admin approves a user's face scan — `userId` is the buyer (or, from older flows, the earner).
  */
 export async function releasePendingCommissions(userId) {
   const pending = await WalletTransaction.find({
     status: COMMISSION_STATUS.PENDING,
     $or: [{ user: userId }, { fromUser: userId }],
-  }).select('user fromUser needsBuyerFace')
+  }).select('fromUser')
   if (!pending.length) return 0
 
-  const ids = [...new Set(pending.flatMap((t) => [String(t.user), String(t.fromUser)]))]
-  const people = await User.find({ _id: { $in: ids }, status: USER_STATUS.APPROVED, deletedAt: null }).select('_id faceVerified')
-  const approved = new Set(people.map((u) => String(u._id)))
-  const faceOk = new Set(people.filter((u) => u.faceVerified).map((u) => String(u._id)))
-  const releasable = pending.filter(
-    (t) => approved.has(String(t.user)) && approved.has(String(t.fromUser)) && (!t.needsBuyerFace || faceOk.has(String(t.fromUser))),
-  )
+  const buyers = [...new Set(pending.map((t) => String(t.fromUser)))]
+  const faceOk = new Set((await User.find({ _id: { $in: buyers }, faceVerified: true, deletedAt: null }).select('_id')).map((u) => String(u._id)))
+  const releasable = pending.filter((t) => faceOk.has(String(t.fromUser)))
   if (!releasable.length) return 0
 
   await WalletTransaction.updateMany(
@@ -42,4 +38,16 @@ export async function migrateWallet() {
   const approved = (await User.find({ _id: { $in: earners }, status: USER_STATUS.APPROVED }).select('_id')).map((u) => u._id)
   await WalletTransaction.collection.updateMany({ ...legacy, user: { $in: approved } }, { $set: { status: COMMISSION_STATUS.AVAILABLE } })
   await WalletTransaction.collection.updateMany(legacy, { $set: { status: COMMISSION_STATUS.PENDING } })
+}
+
+/**
+ * One-off: identity documents are no longer reviewed, so accounts still waiting for that approval become active,
+ * and commission that was only held for it (the buyer's face scan is already approved) is released.
+ */
+export async function migrateApprovals() {
+  await User.updateMany({ status: USER_STATUS.PENDING }, { $set: { status: USER_STATUS.APPROVED } })
+  const buyers = await WalletTransaction.distinct('fromUser', { status: COMMISSION_STATUS.PENDING })
+  if (!buyers.length) return
+  const faceOk = await User.find({ _id: { $in: buyers }, faceVerified: true, deletedAt: null }).distinct('_id')
+  await WalletTransaction.updateMany({ status: COMMISSION_STATUS.PENDING, fromUser: { $in: faceOk } }, { status: COMMISSION_STATUS.AVAILABLE, releasedAt: new Date() })
 }

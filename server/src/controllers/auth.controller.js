@@ -126,6 +126,8 @@ export async function register(req, res) {
     twoFactor: twoFactor ? { enabled: true, secret: twoFactor.secret } : { enabled: false },
     // The face scan is done after sign-in (Account & Security), on the FaceTec host
     face: { status: FACE_STATUS.NONE },
+    // Accounts work as soon as the email is verified; only the face scan is reviewed by an admin
+    status: USER_STATUS.APPROVED,
     termsAcceptedAt: new Date(),
     applicationId: await nextApplicationId(),
   })
@@ -152,7 +154,9 @@ export async function verifyEmail(req, res) {
   if (user.emailVerified) throw new ApiError(400, 'Email is already verified', undefined, 'ALREADY_VERIFIED')
 
   await confirmVerificationCode(user, code)
-  res.json(await applicationSummary(user))
+  // Signed in straight away so the face scan can be offered (or skipped) right after registration
+  if (user.status === USER_STATUS.REJECTED || user.accountStatus === ACCOUNT_STATUS.LOCKED || user.deletedAt) return res.json(await applicationSummary(user))
+  startSession(res, user)
 }
 
 export async function resendVerification(req, res) {
@@ -203,9 +207,6 @@ export async function login(req, res) {
     throw new ApiError(403, 'Please verify your email address', { email: user.email }, 'EMAIL_NOT_VERIFIED')
   }
   // Password was correct, so it's safe to tell the applicant where their application stands
-  if (user.status === USER_STATUS.PENDING) {
-    throw new ApiError(403, 'Your account is waiting for admin approval', await applicationSummary(user), 'ACCOUNT_PENDING')
-  }
   if (user.status === USER_STATUS.REJECTED) {
     throw new ApiError(403, 'Your account application was not approved', await applicationSummary(user), 'ACCOUNT_REJECTED')
   }
@@ -226,7 +227,7 @@ export async function loginTwoFactor(req, res) {
   })
 
   const user = await User.findById(sub).select('+twoFactor.secret +twoFactor.lastUsedStep')
-  if (!user || user.status !== USER_STATUS.APPROVED || user.accountStatus === ACCOUNT_STATUS.LOCKED) {
+  if (!user || user.deletedAt || user.status === USER_STATUS.REJECTED || user.accountStatus === ACCOUNT_STATUS.LOCKED) {
     throw new ApiError(401, 'Login session expired, please sign in again', undefined, 'LOGIN_EXPIRED')
   }
 

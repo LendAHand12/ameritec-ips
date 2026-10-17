@@ -9,6 +9,7 @@ import { SESSION_COOKIE } from '../middlewares/auth.js'
 import { TOKEN_PURPOSE, signToken, verifyToken } from '../utils/tokens.js'
 import { generateTwoFactorSecret, verifyTwoFactorCode } from '../services/twoFactor.service.js'
 import { assertSensitiveAuth, assertTwoFactor } from '../services/withdrawal.service.js'
+import { hasFaceImage, sendFaceImage } from '../services/facetec.service.js'
 
 const REMEMBER_ME_EXPIRES_IN = '30d'
 
@@ -58,6 +59,7 @@ export async function getAccount(req, res) {
         submittedAt: user.face?.submittedAt ?? null,
         reviewedAt: user.face?.reviewedAt ?? null,
         rejectionReason: user.face?.status === FACE_STATUS.REJECTED ? (user.face?.rejectionReason ?? null) : null,
+        hasImage: hasFaceImage(user),
       },
     },
     security: {
@@ -65,6 +67,11 @@ export async function getAccount(req, res) {
       passwordChangedAt: user.passwordChangedAt ?? null,
     },
   })
+}
+
+/** The signed-in user's own face scan photo. */
+export async function getFaceImage(req, res) {
+  await sendFaceImage(res, req.user)
 }
 
 /** Changes the phone number used for sign-in. Needs a fresh authenticator code. */

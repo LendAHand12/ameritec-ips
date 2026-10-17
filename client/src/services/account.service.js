@@ -8,3 +8,6 @@ export const setupTwoFactor = (password) => api.post('/account/2fa/setup', { pas
 export const enableTwoFactor = (setupToken, code) => api.post('/account/2fa/enable', { setupToken, code })
 export const disableTwoFactor = (password, code) => api.post('/account/2fa/disable', { password, code })
 export const signOutOtherSessions = () => api.post('/account/sessions/revoke-others')
+
+/** The signed-in user's own face scan photo (served through our API). */
+export const faceImageUrl = () => `${import.meta.env.VITE_API_URL ?? ''}/api/account/face-image`

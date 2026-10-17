@@ -10,7 +10,7 @@ import { useAdminAuth } from '@/hooks/useAdminAuth'
 import UserNetwork from '@/components/admin/UserNetwork'
 import StatusBadge from '@/components/dashboard/StatusBadge'
 import { ACCOUNT_STATUS, DOCUMENT_TYPE_LABEL, KYC_STATUS } from '@/lib/adminUsers'
-import { formatDate, formatUsdt } from '@/lib/format'
+import { formatDate, formatDateTime, formatUsdt } from '@/lib/format'
 import * as adminService from '@/services/admin.service'
 
 function Row({ label, children }) {
@@ -24,10 +24,13 @@ function Row({ label, children }) {
 
 function DocImage({ userId, side, label }) {
   const url = adminService.identityImageUrl(userId, side)
+  // Hide the tile if the image is missing (e.g. the FaceTec host has no photo for that scan)
+  const [failedUrl, setFailedUrl] = useState(null)
+  if (failedUrl === url) return null
   return (
     <figure className="space-y-1">
       <a href={url} target="_blank" rel="noreferrer" className="group relative block overflow-hidden rounded-lg border bg-muted">
-        <img src={url} alt={label} className="aspect-[3/2] w-full object-contain" />
+        <img src={url} alt={label} className="aspect-[3/2] w-full object-contain" onError={() => setFailedUrl(url)} />
         <span className="absolute top-2 right-2 rounded-md bg-card/90 p-1 opacity-0 transition-opacity group-hover:opacity-100">
           <ExternalLinkIcon className="size-4" />
         </span>
@@ -218,8 +221,8 @@ export default function UserReviewDialog({ userId, onClose, onChanged }) {
                   This user hasn’t confirmed their email yet
                 </p>
                 <p className="text-muted-foreground">
-                  They can’t sign in or be KYC-reviewed until it is. If the verification email never reached them, you can verify it manually — only do this
-                  once you’re sure the address belongs to them. KYC review comes afterwards.
+                  They can’t sign in until it is. If the verification email never reached them, you can verify it manually — only do this
+                  once you’re sure the address belongs to them.
                 </p>
                 {canManage &&
                   (confirmingVerify ? (
@@ -299,22 +302,30 @@ export default function UserReviewDialog({ userId, onClose, onChanged }) {
                   </StatusBadge>
                 </div>
                 <div className="grid gap-4 p-3.5 sm:grid-cols-[180px_1fr]">
-                  {user.face.hasImage ? (
-                    <DocImage userId={user._id} side="face" label={user.face.submittedAt ? `Submitted ${formatDate(user.face.submittedAt)}` : 'Face scan'} />
+                  {user.face.hasImage || user.faceTecTid ? (
+                    <DocImage userId={user._id} side="face" label="Face scan" />
                   ) : (
-                    <div className="space-y-1 rounded-lg bg-muted/60 p-3 text-caption">
-                      <p className="text-muted-foreground">FaceTec transaction</p>
-                      <p className="font-mono font-semibold break-all">{user.faceTecTid ?? '—'}</p>
-                      {user.ageEstimate != null && <p className="pt-1 text-muted-foreground">Estimated age: <span className="font-semibold text-foreground">{Math.round(user.ageEstimate)}</span></p>}
-                      {user.face.submittedAt && <p className="pt-1 text-muted-foreground">Scanned {formatDate(user.face.submittedAt)}</p>}
+                    <div className="flex aspect-[3/2] items-center justify-center rounded-lg bg-muted text-muted-foreground">
+                      <ScanFaceIcon className="size-8" />
                     </div>
                   )}
                   <div className="space-y-3 text-sm">
-                    <p className="text-muted-foreground">
-                      {user.face.status === 'pending' && 'The user completed the FaceTec scan. Check the transaction in FaceTec, then approve — that releases the commission held back for this user’s purchases.'}
-                      {user.face.status === 'approved' && `Approved${user.face.reviewedAt ? ` on ${formatDate(user.face.reviewedAt)}` : ''}.`}
-                      {user.face.status === 'rejected' && `Rejected${user.face.rejectionReason ? `: ${user.face.rejectionReason}` : ''}. The user can send a new photo.`}
-                    </p>
+                    <div className="space-y-1">
+                      <p>
+                        <span className="text-muted-foreground">Face registered: </span>
+                        <span className="font-semibold">{user.face.submittedAt ? formatDateTime(user.face.submittedAt) : '—'}</span>
+                      </p>
+                      {user.ageEstimate != null && (
+                        <p>
+                          <span className="text-muted-foreground">Estimated age: </span>
+                          <span className="font-semibold">{Math.round(user.ageEstimate)}</span>
+                        </p>
+                      )}
+                      {user.face.status === 'approved' && <p className="text-muted-foreground">Approved{user.face.reviewedAt ? ` on ${formatDate(user.face.reviewedAt)}` : ''}.</p>}
+                      {user.face.status === 'rejected' && (
+                        <p className="text-muted-foreground">Rejected{user.face.rejectionReason ? `: ${user.face.rejectionReason}` : ''}. The user can scan again.</p>
+                      )}
+                    </div>
                     {canManage && !deleted && user.face.status === 'pending' && (
                       <div className="flex flex-wrap gap-2">
                         <Button size="sm" disabled={!!busy} onClick={() => run('faceApprove', () => adminService.approveFace(user._id), 'Face scan approved')}>

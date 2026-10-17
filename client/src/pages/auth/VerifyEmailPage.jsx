@@ -1,15 +1,17 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom'
-import { ArrowRightIcon, MailIcon } from 'lucide-react'
+import { ArrowRightIcon, CheckCircle2Icon, MailIcon, ScanFaceIcon } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button, buttonVariants } from '@/components/ui/button'
 import AuthCard from '@/components/auth/AuthCard'
 import { FieldError } from '@/components/ui/field'
 import { Spinner } from '@/components/ui/spinner'
 import OtpInput from '@/components/auth/OtpInput'
+import { useAuth } from '@/hooks/useAuth'
 import { useCountdown } from '@/hooks/useCountdown'
 import { normalizeEmail } from '@/lib/normalize'
 import { resendVerification, verifyEmail } from '@/services/auth.service'
+import { startFaceScan } from '@/services/kyc.service'
 
 export default function VerifyEmailPage() {
   const [searchParams] = useSearchParams()
@@ -25,6 +27,10 @@ export default function VerifyEmailPage() {
   // Coming straight from registration the code was just sent
   const [cooldown, setCooldown] = useCountdown(location.state?.emailSent ? 60 : 0)
   const autoResent = useRef(false)
+  const { setUser } = useAuth()
+  // Set once the email is verified: the server has signed the user in, and we offer the face scan before moving on
+  const [verifiedUser, setVerifiedUser] = useState(null)
+  const [startingFace, setStartingFace] = useState(false)
 
   const handleResend = async () => {
     setResending(true)
@@ -54,8 +60,9 @@ export default function VerifyEmailPage() {
     setVerifying(true)
     setError('')
     try {
-      const application = await verifyEmail(email, value)
-      navigate('/application-status', { replace: true, state: application })
+      const res = await verifyEmail(email, value)
+      if (res.user) setVerifiedUser(res.user)
+      else navigate('/application-status', { replace: true, state: res })
     } catch (err) {
       setError(err.message)
       setCode('')
@@ -67,6 +74,49 @@ export default function VerifyEmailPage() {
   const wrap = (content) => (
     <div className="flex w-full max-w-[550px] flex-1 flex-col justify-center py-[37.5px]">{content}</div>
   )
+
+  // Hands the browser to the FaceTec page; it comes back to /user/kyc-callback (the session cookie is already set)
+  const beginFaceScan = async () => {
+    setStartingFace(true)
+    try {
+      const { url } = await startFaceScan()
+      window.location.assign(url)
+    } catch (err) {
+      toast.error(err.message)
+      setStartingFace(false)
+    }
+  }
+
+  if (verifiedUser) {
+    return wrap(
+      <AuthCard
+        icon={CheckCircle2Icon}
+        title="Your email is verified"
+        description="Your account is ready — you can sign in, buy shares and invite referrals right away."
+      >
+        <div className="flex flex-col items-center gap-3 rounded-lg border border-dashed px-6 py-8 text-center">
+          <span className="flex size-14 items-center justify-center rounded-2xl bg-primary-soft text-primary">
+            <ScanFaceIcon className="size-8" />
+          </span>
+          <h3 className="text-title font-bold">Scan your face now?</h3>
+          <p className="max-w-sm text-sm text-muted-foreground">
+            It takes about a minute. You need an approved face scan to withdraw commission, and the commission your referrer earns from your
+            purchases is held until it’s approved. You can also do it later from Account &amp; Security.
+          </p>
+        </div>
+        <div className="mt-[22.5px] flex flex-col gap-3">
+          <Button size="xl" className="w-full" onClick={beginFaceScan} disabled={startingFace}>
+            {startingFace ? <Spinner className="size-5" /> : <ScanFaceIcon />}
+            Scan my face now
+          </Button>
+          {/* Setting the user lets the guest route move on to the dashboard */}
+          <Button size="xl" variant="outline" className="w-full bg-card" onClick={() => setUser(verifiedUser)} disabled={startingFace}>
+            Skip for now
+          </Button>
+        </div>
+      </AuthCard>,
+    )
+  }
 
   if (!email) {
     return wrap(

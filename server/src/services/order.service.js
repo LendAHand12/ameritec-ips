@@ -3,7 +3,7 @@ import Order, { ORDER_STATUS } from '../models/Order.js'
 import { getSettings } from '../models/Setting.js'
 import User from '../models/User.js'
 import WalletTransaction, { COMMISSION_STATUS } from '../models/WalletTransaction.js'
-import { isFaceApproved, isKycApproved } from './commission.service.js'
+import { commissionReleasable, isFaceApproved } from './commission.service.js'
 import { verifyUsdtPayment } from './bsc.service.js'
 import { notifyPaymentNeedsReview, notifyUnverifiedPayment } from './telegram.service.js'
 
@@ -35,9 +35,9 @@ async function payReferralCommission(order) {
       order: order._id,
       fromUser: buyer._id,
       commissionPct: pct,
-      // Not withdrawable until the earner and the buyer are both KYC-approved by an admin, and the buyer's face scan
-      // is approved too. The buyer can still buy without a face scan — only the referrer's payout waits.
-      status: isKycApproved(referrer) && isKycApproved(buyer) && isFaceApproved(buyer) ? COMMISSION_STATUS.AVAILABLE : COMMISSION_STATUS.PENDING,
+      // Held until the buyer's face scan is approved by an admin. The buyer can still buy without one — only the
+      // referrer's commission waits (and the referrer needs their own approved face scan to withdraw it).
+      status: commissionReleasable(buyer) ? COMMISSION_STATUS.AVAILABLE : COMMISSION_STATUS.PENDING,
       needsBuyerFace: !isFaceApproved(buyer),
     })
   } catch (err) {

@@ -39,8 +39,11 @@ export async function assertSensitiveAuth(userId, { code, password } = {}) {
 
 /** Creates a withdrawal for `user` (a loaded User). The code must already be verified. */
 export async function requestWithdrawal(user, amountCents) {
-  if (user.status !== USER_STATUS.APPROVED || user.accountStatus !== ACCOUNT_STATUS.ACTIVE || user.deletedAt) {
+  if (user.status === USER_STATUS.REJECTED || user.accountStatus !== ACCOUNT_STATUS.ACTIVE || user.deletedAt) {
     throw new ApiError(403, 'Your account can’t withdraw right now', undefined, 'WITHDRAW_NOT_ALLOWED')
+  }
+  if (!user.faceVerified) {
+    throw new ApiError(403, 'Complete your face scan and wait for it to be approved before withdrawing commission', undefined, 'FACE_SCAN_REQUIRED')
   }
   const address = user.withdrawalWallet?.address
   if (!address) throw new ApiError(400, 'Add a withdrawal wallet first', { address: 'No withdrawal wallet saved' }, 'NO_WALLET')

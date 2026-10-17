@@ -36,6 +36,7 @@ const router = Router()
 router.use(protect)
 
 router.get('/', account.getAccount)
+router.get('/face-image', account.getFaceImage)
 router.patch('/phone', otpLimiter, validate(updatePhoneSchema), account.updatePhone)
 router.post('/password', otpLimiter, validate(changePasswordSchema), account.changePassword)
 router.post('/2fa/setup', otpLimiter, validate(setupTwoFactorSchema), account.setupTwoFactor)

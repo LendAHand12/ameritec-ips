@@ -29,6 +29,8 @@ const env = {
   // Face scan runs on a separate FaceTec host: the browser is sent there and comes back to /user/kyc-callback
   facetec: {
     baseUrl: process.env.FACETEC_BASE_URL?.replace(/\/+$/, ''),
+    // Liveness API that serves the scan photo for a transaction (GET /api/liveness/image?tid=…)
+    apiHost: process.env.FACETEC_HOST?.replace(/\/+$/, ''),
     // false (default): a successful scan still waits for an admin to approve it, then commission is released
     autoApprove: process.env.FACETEC_AUTO_APPROVE === 'true',
   },

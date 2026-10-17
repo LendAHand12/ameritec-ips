@@ -13,9 +13,9 @@ import StatusBadge from '@/components/dashboard/StatusBadge'
 import { useAsync } from '@/hooks/useAsync'
 import { useAuth } from '@/hooks/useAuth'
 import { DOCUMENT_TYPE_LABEL, KYC_STATUS } from '@/lib/adminUsers'
-import { formatDate, formatDateTime24 } from '@/lib/format'
+import { formatDate, formatDateTime, formatDateTime24 } from '@/lib/format'
 import { cn } from '@/lib/utils'
-import { getAccount, getSession, signOutOtherSessions } from '@/services/account.service'
+import { faceImageUrl, getAccount, getSession, signOutOtherSessions } from '@/services/account.service'
 import { startFaceScan } from '@/services/kyc.service'
 
 const TABS = [
@@ -129,6 +129,8 @@ const FACE_STATUS = {
 function IdentityTab({ account, onAddFace, startingFace }) {
   const { identity, profile } = account
   const kyc = KYC_STATUS[profile.status]
+  // Hidden if the photo can't be loaded (e.g. the face scan host is unreachable)
+  const [faceImageFailed, setFaceImageFailed] = useState(false)
   return (
     <>
       <SectionHeader title="Identity Verification" description="The identity documents you submitted when you joined." />
@@ -159,7 +161,7 @@ function IdentityTab({ account, onAddFace, startingFace }) {
               {identity.face.status === 'approved' && `Verified${identity.face.reviewedAt ? ` on ${formatDate(identity.face.reviewedAt)}` : ''}.`}
               {identity.face.status === 'pending' && `Submitted ${formatDate(identity.face.submittedAt)} — our team will review it shortly.`}
               {identity.face.status === 'rejected' && `Not approved${identity.face.rejectionReason ? `: ${identity.face.rejectionReason}` : ''}. Please take a new photo.`}
-              {identity.face.status === 'none' && 'Optional, but needed to release commission: until your face scan is approved, your referrer can’t withdraw the commission from your purchases. You can still buy shares. You’ll be taken to our secure face scan page and brought back here.'}
+              {identity.face.status === 'none' && 'Optional for buying shares, but needed to withdraw commission — and the commission your referrer earns from your purchases is held until it’s approved. You’ll be taken to our secure face scan page and brought back here.'}
             </p>
           </div>
           {(identity.face.status === 'none' || identity.face.status === 'rejected') && (
@@ -169,6 +171,17 @@ function IdentityTab({ account, onAddFace, startingFace }) {
             </Button>
           )}
         </div>
+        {identity.face.hasImage && !faceImageFailed && (
+          <figure className="mt-4 w-full max-w-[240px] space-y-1">
+            <img
+              src={faceImageUrl()}
+              alt="Your face scan"
+              className="aspect-[3/2] w-full rounded-lg border bg-muted object-contain"
+              onError={() => setFaceImageFailed(true)}
+            />
+            {identity.face.submittedAt && <figcaption className="text-caption text-muted-foreground">Registered {formatDateTime(identity.face.submittedAt)}</figcaption>}
+          </figure>
+        )}
       </div>
       <div className="mt-[18.75px] flex items-start gap-3 rounded-lg bg-muted p-4">
         <ShieldCheckIcon className="mt-0.5 size-5 shrink-0 text-muted-foreground" />

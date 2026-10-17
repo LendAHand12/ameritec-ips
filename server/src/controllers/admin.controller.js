@@ -9,6 +9,7 @@ import { maskEmail, maskPhone } from '../utils/mask.js'
 import { sendAccountApprovedEmail, sendAccountRejectedEmail } from '../services/mail.service.js'
 import { describeAudit, investorOf } from '../services/audit.service.js'
 import { releasePendingCommissions } from '../services/commission.service.js'
+import { sendFaceImage } from '../services/facetec.service.js'
 import WalletTransaction, { getWalletSummary } from '../models/WalletTransaction.js'
 
 const userRecord = (u) => ({ type: 'user', id: u.id, ref: u.applicationId ?? u.referralCode ?? u.email })
@@ -165,7 +166,8 @@ export async function getIdentityImage(req, res) {
   if (!IMAGE_FIELDS[side] && side !== 'face') throw new ApiError(404, 'Image not found')
 
   const user = await findUserOrThrow(id, { allowDeleted: true })
-  const filename = side === 'face' ? user.face?.image : user.identity?.[IMAGE_FIELDS[side]]
+  if (side === 'face') return sendFaceImage(res, user)
+  const filename = user.identity?.[IMAGE_FIELDS[side]]
   if (!filename) throw new ApiError(404, 'Image not found')
 
   res.set('Cache-Control', 'private, no-store')

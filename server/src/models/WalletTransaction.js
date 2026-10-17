@@ -67,7 +67,7 @@ export async function getWalletSummary(userId) {
   return {
     earnedCents: available + pending, // everything ever credited
     availableCents: available - requested - paid, // can be withdrawn now
-    pendingCents: pending, // waiting for KYC approval
+    pendingCents: pending, // waiting for the buyer's face scan to be approved
     requestedCents: requested, // withdrawal requests awaiting payment
     withdrawnCents: paid,
   }
