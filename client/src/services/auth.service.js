@@ -6,7 +6,7 @@ export const setupTwoFactor = (email) => api.post('/auth/register/2fa/setup', { 
 
 export const verifyTwoFactorSetup = (setupToken, code) => api.post('/auth/register/2fa/verify', { setupToken, code })
 
-export function register({ account, identity, twoFactor, face }) {
+export function register({ account, identity, twoFactor }) {
   const form = new FormData()
   for (const [key, value] of Object.entries(account)) {
     if (value) form.append(key, value)
@@ -15,9 +15,8 @@ export function register({ account, identity, twoFactor, face }) {
   form.append('documentFront', identity.front)
   form.append('documentBack', identity.back)
   if (identity.supporting) form.append('supportingDocument', identity.supporting)
-  // Both are optional at sign-up: two-factor and the face scan can be added later
+  // Optional at sign-up: two-factor can be switched on later (the face scan happens after sign-in)
   if (twoFactor?.twoFactorToken) form.append('twoFactorToken', twoFactor.twoFactorToken)
-  if (face?.file) form.append('face', face.file)
   return api.post('/auth/register', form)
 }
 

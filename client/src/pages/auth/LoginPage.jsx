@@ -120,7 +120,9 @@ export default function LoginPage() {
 
   const finishLogin = (user) => {
     setUser(user)
-    navigate(location.state?.from?.pathname ?? '/dashboard', { replace: true })
+    // Keep the query string: the face scan callback carries its result there
+    const from = location.state?.from
+    navigate(from ? `${from.pathname}${from.search ?? ''}` : '/dashboard', { replace: true })
   }
 
   const onSubmit = async (payload) => {

@@ -1,32 +1,21 @@
-import { useState } from 'react'
-import { InfoIcon } from 'lucide-react'
-import FaceCapture from '@/components/account/FaceCapture'
+import { ScanFaceIcon } from 'lucide-react'
 import StepActions from './StepActions'
 
-/** Optional: take the face scan now, or skip and add it later from Account & Security. */
-export default function StepFaceId({ value, onBack, onNext }) {
-  const [file, setFile] = useState(value?.file ?? null)
-
+/** The face scan itself happens after sign-in (it needs your account), so here we only explain it. */
+export default function StepFaceId({ onBack, onNext }) {
   return (
     <div className="flex flex-col gap-5">
-      <FaceCapture value={file} onChange={setFile} />
-
-      <div className="flex items-start gap-2.5 rounded-lg bg-muted p-3.5 text-caption text-muted-foreground">
-        <InfoIcon className="mt-px size-4 shrink-0" />
-        <p>
-          This step is <span className="font-semibold text-foreground">optional</span>. You can buy shares without it, but the commission your referrer earns from your
-          purchases is only released once you add a face scan and our team approves it.
+      <div className="flex flex-col items-center gap-3 rounded-lg border border-dashed px-6 py-10 text-center">
+        <span className="flex size-14 items-center justify-center rounded-2xl bg-primary-soft text-primary">
+          <ScanFaceIcon className="size-8" />
+        </span>
+        <h3 className="text-title font-bold">You’ll scan your face after your account is approved</h3>
+        <p className="max-w-md text-sm text-muted-foreground">
+          Once you can sign in, open <span className="font-semibold text-foreground">Account &amp; Security → Identity Verification</span> and start the secure face scan.
+          It’s optional and you can buy shares without it — but the commission your referrer earns from your purchases is only released once your face scan is approved.
         </p>
       </div>
-
-      <StepActions onBack={onBack} nextLabel="Continue" nextDisabled={!file} onNext={() => onNext({ file })} />
-      <button
-        type="button"
-        onClick={() => onNext(null)}
-        className="-mt-2 self-center text-title font-semibold text-primary hover:underline"
-      >
-        Skip for now — I’ll do this later
-      </button>
+      <StepActions onBack={onBack} onNext={() => onNext(null)} />
     </div>
   )
 }

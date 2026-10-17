@@ -89,7 +89,6 @@ export async function register(req, res) {
   const front = req.files?.documentFront?.[0]
   const back = req.files?.documentBack?.[0]
   const supporting = req.files?.supportingDocument?.[0]
-  const face = req.files?.face?.[0]
   if (!front || !back) {
     const details = {}
     if (!front) details.documentFront = 'Front image is required'
@@ -125,8 +124,8 @@ export async function register(req, res) {
       supportingImage: supporting?.filename,
     },
     twoFactor: twoFactor ? { enabled: true, secret: twoFactor.secret } : { enabled: false },
-    // An optional face scan waits for an admin to approve it
-    face: face ? { status: FACE_STATUS.PENDING, image: face.filename, submittedAt: new Date() } : { status: FACE_STATUS.NONE },
+    // The face scan is done after sign-in (Account & Security), on the FaceTec host
+    face: { status: FACE_STATUS.NONE },
     termsAcceptedAt: new Date(),
     applicationId: await nextApplicationId(),
   })

@@ -20,7 +20,7 @@ export const STEPS = [
     label: 'Face Scan',
     icon: ScanFaceIcon,
     title: 'Face scan (optional)',
-    description: 'Register your face to protect your account — you can also do this later.',
+    description: 'Done after your account is approved, from Account & Security.',
   },
   {
     id: 'twoFactor',

@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Spinner } from '@/components/ui/spinner'
 import PageHeader from '@/components/PageHeader'
 import { ChangePasswordDialog, EditContactDialog } from '@/components/account/AccountDialogs'
-import { DisableTwoFactorDialog, EnableTwoFactorDialog, FaceScanDialog } from '@/components/account/SecurityDialogs'
+import { DisableTwoFactorDialog, EnableTwoFactorDialog } from '@/components/account/SecurityDialogs'
 import { Panel } from '@/components/dashboard/Panel'
 import { scoreLabel, securityChecks } from '@/components/dashboard/AccountStatusCard'
 import StatusBadge from '@/components/dashboard/StatusBadge'
@@ -16,6 +16,7 @@ import { DOCUMENT_TYPE_LABEL, KYC_STATUS } from '@/lib/adminUsers'
 import { formatDate, formatDateTime24 } from '@/lib/format'
 import { cn } from '@/lib/utils'
 import { getAccount, getSession, signOutOtherSessions } from '@/services/account.service'
+import { startFaceScan } from '@/services/kyc.service'
 
 const TABS = [
   { value: 'profile', label: 'Profile', icon: UserRoundIcon },
@@ -125,7 +126,7 @@ const FACE_STATUS = {
   rejected: { label: 'Rejected', tone: 'danger' },
 }
 
-function IdentityTab({ account, onAddFace }) {
+function IdentityTab({ account, onAddFace, startingFace }) {
   const { identity, profile } = account
   const kyc = KYC_STATUS[profile.status]
   return (
@@ -158,11 +159,12 @@ function IdentityTab({ account, onAddFace }) {
               {identity.face.status === 'approved' && `Verified${identity.face.reviewedAt ? ` on ${formatDate(identity.face.reviewedAt)}` : ''}.`}
               {identity.face.status === 'pending' && `Submitted ${formatDate(identity.face.submittedAt)} — our team will review it shortly.`}
               {identity.face.status === 'rejected' && `Not approved${identity.face.rejectionReason ? `: ${identity.face.rejectionReason}` : ''}. Please take a new photo.`}
-              {identity.face.status === 'none' && 'Optional, but needed to release commission: until your face scan is approved, your referrer can’t withdraw the commission from your purchases. You can still buy shares.'}
+              {identity.face.status === 'none' && 'Optional, but needed to release commission: until your face scan is approved, your referrer can’t withdraw the commission from your purchases. You can still buy shares. You’ll be taken to our secure face scan page and brought back here.'}
             </p>
           </div>
           {(identity.face.status === 'none' || identity.face.status === 'rejected') && (
-            <Button className="font-semibold" onClick={onAddFace}>
+            <Button className="font-semibold" onClick={onAddFace} disabled={startingFace}>
+              {startingFace && <Spinner />}
               {identity.face.status === 'rejected' ? 'Try again' : 'Add face scan'}
             </Button>
           )}
@@ -324,13 +326,25 @@ export default function AccountPage() {
   const tab = TABS.some((t) => t.value === searchParams.get('tab')) ? searchParams.get('tab') : 'profile'
   const [reloadKey, setReloadKey] = useState(0)
   const { data: account, error } = useAsync(getAccount, [reloadKey])
-  const [dialog, setDialog] = useState(null) // 'contact' | 'password' | 'face' | 'twofa'
+  const [dialog, setDialog] = useState(null) // 'contact' | 'password' | 'twofa'
+  const [startingFace, setStartingFace] = useState(false)
 
   const checks = securityChecks(user)
   const score = scoreLabel(checks.filter((c) => c.ok).length / checks.length)
   const reload = () => {
     setDialog(null)
     setReloadKey((k) => k + 1)
+  }
+  // Hands the browser to the FaceTec page; it returns to /user/kyc-callback when the scan is done
+  const beginFaceScan = async () => {
+    setStartingFace(true)
+    try {
+      const { url } = await startFaceScan()
+      window.location.assign(url)
+    } catch (err) {
+      toast.error(err.message)
+      setStartingFace(false)
+    }
   }
   // Two-factor changes how sensitive actions ask for confirmation everywhere, so refresh the signed-in user too
   const reloadAfterTwoFactor = async () => {
@@ -394,7 +408,7 @@ export default function AccountPage() {
 
           <Panel className="p-[25px]">
             {tab === 'profile' && <ProfileTab account={account} onEdit={() => setDialog('contact')} />}
-            {tab === 'identity' && <IdentityTab account={account} onAddFace={() => setDialog('face')} />}
+            {tab === 'identity' && <IdentityTab account={account} onAddFace={beginFaceScan} startingFace={startingFace} />}
             {tab === 'security' && <SecurityTab account={account} onChangePassword={() => setDialog('password')} onToggleTwoFactor={() => setDialog('twofa')} />}
             {tab === 'sessions' && <SessionsTab />}
           </Panel>
@@ -402,7 +416,6 @@ export default function AccountPage() {
       )}
 
       <EditContactDialog key={`c-${dialog === 'contact'}`} open={dialog === 'contact'} onClose={() => setDialog(null)} onSaved={reload} />
-      <FaceScanDialog key={`f-${dialog === 'face'}`} open={dialog === 'face'} onClose={() => setDialog(null)} onSubmitted={reload} />
       {account?.security.twoFactorEnabled ? (
         <DisableTwoFactorDialog key={`d2-${dialog === 'twofa'}`} open={dialog === 'twofa'} onClose={() => setDialog(null)} onDisabled={reloadAfterTwoFactor} />
       ) : (

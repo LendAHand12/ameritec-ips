@@ -30,7 +30,6 @@ router.post(
     { name: 'documentFront', maxCount: 1 },
     { name: 'documentBack', maxCount: 1 },
     { name: 'supportingDocument', maxCount: 1 },
-    { name: 'face', maxCount: 1 },
   ]),
   validate(registerSchema),
   auth.register,

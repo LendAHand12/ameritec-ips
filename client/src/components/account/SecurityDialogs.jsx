@@ -5,50 +5,9 @@ import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { FieldError } from '@/components/ui/field'
 import { Spinner } from '@/components/ui/spinner'
-import FaceCapture from '@/components/account/FaceCapture'
 import OtpInput from '@/components/auth/OtpInput'
 import PasswordInput from '@/components/auth/PasswordInput'
-import { disableTwoFactor, enableTwoFactor, setupTwoFactor, submitFace } from '@/services/account.service'
-
-/** Add (or retake) the face scan. It goes to our team for approval. */
-export function FaceScanDialog({ open, onClose, onSubmitted }) {
-  const [file, setFile] = useState(null)
-  const [saving, setSaving] = useState(false)
-
-  const submit = async () => {
-    setSaving(true)
-    try {
-      await submitFace(file)
-      toast.success('Face scan sent for review')
-      onSubmitted()
-    } catch (err) {
-      toast.error(err.details?.face ?? err.message)
-    } finally {
-      setSaving(false)
-    }
-  }
-
-  return (
-    <Dialog open={open} onOpenChange={(o) => !o && !saving && onClose()}>
-      <DialogContent className="max-h-[92svh] overflow-y-auto sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle className="text-subheading font-bold">Add your face scan</DialogTitle>
-          <DialogDescription>Take a clear selfie. Our team reviews it — until it’s approved, commission your referrer earns from your purchases stays on hold.</DialogDescription>
-        </DialogHeader>
-        <FaceCapture value={file} onChange={setFile} disabled={saving} />
-        <DialogFooter>
-          <Button type="button" variant="outline" onClick={onClose} disabled={saving}>
-            Cancel
-          </Button>
-          <Button onClick={submit} disabled={!file || saving}>
-            {saving && <Spinner />}
-            Send for review
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  )
-}
+import { disableTwoFactor, enableTwoFactor, setupTwoFactor } from '@/services/account.service'
 
 /** Turn two-factor on: confirm the password, scan the QR code, enter a code from the app. */
 export function EnableTwoFactorDialog({ open, onClose, onEnabled }) {

@@ -7,6 +7,7 @@ import { Spinner } from '@/components/ui/spinner'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { useAdminAuth } from '@/hooks/useAdminAuth'
+import UserNetwork from '@/components/admin/UserNetwork'
 import StatusBadge from '@/components/dashboard/StatusBadge'
 import { ACCOUNT_STATUS, DOCUMENT_TYPE_LABEL, KYC_STATUS } from '@/lib/adminUsers'
 import { formatDate, formatUsdt } from '@/lib/format'
@@ -41,6 +42,9 @@ export default function UserReviewDialog({ userId, onClose, onChanged }) {
   const { can } = useAdminAuth()
   const canManage = can('users:manage')
   const [user, setUser] = useState(null)
+  // Opening a member from the network list stacks their profile on top; Back returns to the previous one
+  const [trail, setTrail] = useState([])
+  const currentId = trail.at(-1) ?? userId
   const [busy, setBusy] = useState(null)
   const [mode, setMode] = useState(null) // 'reject' | 'lock' | 'delete' | 'faceReject' while asking for a reason
   const [editingReferrer, setEditingReferrer] = useState(false)
@@ -48,21 +52,23 @@ export default function UserReviewDialog({ userId, onClose, onChanged }) {
   const [referrerCode, setReferrerCode] = useState('')
   const [reason, setReason] = useState('')
 
+  useEffect(() => setTrail([]), [userId])
+
   useEffect(() => {
-    if (!userId) return
+    if (!currentId) return
     setUser(null)
     setMode(null)
     setReason('')
     setEditingReferrer(false)
     setConfirmingVerify(false)
     adminService
-      .getUser(userId)
+      .getUser(currentId)
       .then(({ data }) => setUser(data))
       .catch((err) => {
         toast.error(err.message)
         onClose()
       })
-  }, [userId, onClose])
+  }, [currentId, onClose])
 
   const run = async (key, action, successMessage) => {
     setBusy(key)
@@ -109,6 +115,11 @@ export default function UserReviewDialog({ userId, onClose, onChanged }) {
           </div>
         ) : (
           <>
+            {trail.length > 0 && (
+              <button type="button" onClick={() => setTrail((t) => t.slice(0, -1))} className="-mb-2 self-start text-caption font-semibold text-primary hover:underline">
+                ← Back
+              </button>
+            )}
             <DialogHeader>
               <DialogTitle className="text-subheading font-bold">{user.fullName}</DialogTitle>
               <DialogDescription className="flex flex-wrap items-center gap-2">
@@ -198,6 +209,8 @@ export default function UserReviewDialog({ userId, onClose, onChanged }) {
               </section>
             )}
 
+            <UserNetwork key={user._id} userId={user._id} onOpenUser={(id) => setTrail((t) => [...t, id])} />
+
             {!user.emailVerified && !deleted && (
               <div className="space-y-2.5 rounded-lg border border-warning/30 bg-warning-soft p-3.5 text-sm">
                 <p className="flex items-center gap-2 font-semibold text-warning">
@@ -286,10 +299,19 @@ export default function UserReviewDialog({ userId, onClose, onChanged }) {
                   </StatusBadge>
                 </div>
                 <div className="grid gap-4 p-3.5 sm:grid-cols-[180px_1fr]">
-                  <DocImage userId={user._id} side="face" label={user.face.submittedAt ? `Submitted ${formatDate(user.face.submittedAt)}` : 'Face scan'} />
+                  {user.face.hasImage ? (
+                    <DocImage userId={user._id} side="face" label={user.face.submittedAt ? `Submitted ${formatDate(user.face.submittedAt)}` : 'Face scan'} />
+                  ) : (
+                    <div className="space-y-1 rounded-lg bg-muted/60 p-3 text-caption">
+                      <p className="text-muted-foreground">FaceTec transaction</p>
+                      <p className="font-mono font-semibold break-all">{user.faceTecTid ?? '—'}</p>
+                      {user.ageEstimate != null && <p className="pt-1 text-muted-foreground">Estimated age: <span className="font-semibold text-foreground">{Math.round(user.ageEstimate)}</span></p>}
+                      {user.face.submittedAt && <p className="pt-1 text-muted-foreground">Scanned {formatDate(user.face.submittedAt)}</p>}
+                    </div>
+                  )}
                   <div className="space-y-3 text-sm">
                     <p className="text-muted-foreground">
-                      {user.face.status === 'pending' && 'Check that the photo is a clear, live selfie of the same person as on the identity document. Approving it releases commission held back for this user’s purchases.'}
+                      {user.face.status === 'pending' && 'The user completed the FaceTec scan. Check the transaction in FaceTec, then approve — that releases the commission held back for this user’s purchases.'}
                       {user.face.status === 'approved' && `Approved${user.face.reviewedAt ? ` on ${formatDate(user.face.reviewedAt)}` : ''}.`}
                       {user.face.status === 'rejected' && `Rejected${user.face.rejectionReason ? `: ${user.face.rejectionReason}` : ''}. The user can send a new photo.`}
                     </p>

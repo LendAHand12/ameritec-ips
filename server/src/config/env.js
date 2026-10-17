@@ -26,6 +26,12 @@ const env = {
     // Smallest commission payout a user can request
     minUsdt: Number(process.env.MIN_WITHDRAWAL_USDT ?? 10),
   },
+  // Face scan runs on a separate FaceTec host: the browser is sent there and comes back to /user/kyc-callback
+  facetec: {
+    baseUrl: process.env.FACETEC_BASE_URL?.replace(/\/+$/, ''),
+    // false (default): a successful scan still waits for an admin to approve it, then commission is released
+    autoApprove: process.env.FACETEC_AUTO_APPROVE === 'true',
+  },
   // Admin alerts (new payments to verify). Leave empty to disable.
   telegram: {
     botToken: process.env.TELEGRAM_BOT_TOKEN,

@@ -1,5 +1,3 @@
-import fs from 'fs'
-import path from 'path'
 import jwt from 'jsonwebtoken'
 import env from '../config/env.js'
 import User, { FACE_STATUS } from '../models/User.js'
@@ -10,7 +8,6 @@ import { normalizePhone } from '../utils/normalize.js'
 import { SESSION_COOKIE } from '../middlewares/auth.js'
 import { TOKEN_PURPOSE, signToken, verifyToken } from '../utils/tokens.js'
 import { generateTwoFactorSecret, verifyTwoFactorCode } from '../services/twoFactor.service.js'
-import { notifyFaceSubmitted } from '../services/telegram.service.js'
 import { assertSensitiveAuth, assertTwoFactor } from '../services/withdrawal.service.js'
 
 const REMEMBER_ME_EXPIRES_IN = '30d'
@@ -129,27 +126,6 @@ export async function signOutOtherSessions(req, res) {
   await user.save()
   reissueSession(req, res, user)
   res.json({ revokedAt: user.sessionsRevokedAt })
-}
-
-// ---- Face scan (optional at sign-up, can be added later) ----
-
-/** Uploads a face scan. It stays "pending" until an admin approves it; only then is the account face-verified. */
-export async function submitFace(req, res) {
-  if (!req.file) throw new ApiError(400, 'Take or choose a photo of your face', { face: 'Required' })
-  const user = await User.findById(req.user._id)
-  if (user.faceVerified || user.face?.status === FACE_STATUS.APPROVED) {
-    fs.promises.unlink(req.file.path).catch(() => {})
-    throw new ApiError(409, 'Your face scan is already verified. Contact support to change it.')
-  }
-
-  const previous = user.face?.image
-  user.face = { status: FACE_STATUS.PENDING, image: req.file.filename, submittedAt: new Date() }
-  user.faceVerified = false
-  await user.save()
-  if (previous) fs.promises.unlink(path.resolve(env.kyc.dir, path.basename(previous))).catch(() => {})
-
-  notifyFaceSubmitted(user)
-  res.status(201).json({ face: { status: user.face.status, submittedAt: user.face.submittedAt } })
 }
 
 // ---- Two-factor authentication (optional: switch it on or off from here) ----

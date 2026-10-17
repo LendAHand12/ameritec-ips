@@ -44,7 +44,7 @@ function Thumb({ file, label }) {
 }
 
 export default function StepReview({ data, onEdit, onBack, onSubmit, submitting }) {
-  const { account, referrer, identity, face, twoFactor } = data
+  const { account, referrer, identity, twoFactor } = data
   const country = COUNTRY_BY_ISO[account.phoneCountry]
 
   return (
@@ -87,7 +87,7 @@ export default function StepReview({ data, onEdit, onBack, onSubmit, submitting 
       <Section title="Security">
         <dl className="space-y-2">
           <Row label="Face ID">
-            <Badge variant={face?.file ? 'default' : 'secondary'}>{face?.file ? 'Photo added — pending review' : 'Skipped — add later'}</Badge>
+            <Badge variant="secondary">After approval</Badge>
           </Row>
           <Row label="Two-factor auth">
             <Badge variant={twoFactor ? 'default' : 'secondary'}>{twoFactor ? 'Enabled' : 'Skipped — optional'}</Badge>

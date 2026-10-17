@@ -76,6 +76,7 @@ router.get('/users', requirePermission('users:view'), validate(listUsersQuerySch
 router.get('/users/stats', requirePermission('users:view'), admin.getUserStats)
 router.get('/users/export', requirePermission('users:view'), validate(exportUsersQuerySchema, 'query'), admin.exportUsers)
 router.get('/users/:id', requirePermission('users:view'), admin.getUser)
+router.get('/users/:id/network', requirePermission('users:view'), admin.getUserNetwork)
 router.get('/users/:id/identity/:side', requirePermission('users:view'), admin.getIdentityImage)
 router.patch('/users/:id/approve', requirePermission('users:manage'), act('user.approve'), admin.approveUser)
 router.patch('/users/:id/reject', requirePermission('users:manage'), act('user.reject'), validate(rejectUserSchema), admin.rejectUser)

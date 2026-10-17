@@ -9,6 +9,7 @@ export const TOKEN_PURPOSE = {
   TWO_FACTOR_SETUP: '2fa_setup',
   TWO_FACTOR_VERIFIED: '2fa_verified',
   LOGIN_2FA: 'login_2fa',
+  FACE_SCAN: 'face_scan',
 }
 
 export function signToken(purpose, payload, expiresIn) {

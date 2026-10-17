@@ -2,7 +2,6 @@ import { Router } from 'express'
 import { z } from 'zod'
 import * as account from '../controllers/account.controller.js'
 import { protect } from '../middlewares/auth.js'
-import { kycUpload } from '../middlewares/upload.js'
 import { authLimiter, otpLimiter } from '../middlewares/rateLimit.js'
 import { validate } from '../middlewares/validate.js'
 import { passwordSchema } from '../validators/auth.validator.js'
@@ -39,7 +38,6 @@ router.use(protect)
 router.get('/', account.getAccount)
 router.patch('/phone', otpLimiter, validate(updatePhoneSchema), account.updatePhone)
 router.post('/password', otpLimiter, validate(changePasswordSchema), account.changePassword)
-router.post('/face', authLimiter, kycUpload.single('face'), account.submitFace)
 router.post('/2fa/setup', otpLimiter, validate(setupTwoFactorSchema), account.setupTwoFactor)
 router.post('/2fa/enable', otpLimiter, validate(enableTwoFactorSchema), account.enableTwoFactor)
 router.post('/2fa/disable', otpLimiter, validate(disableTwoFactorSchema), account.disableTwoFactor)

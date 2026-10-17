@@ -36,6 +36,11 @@ const userSchema = new mongoose.Schema(
     },
     // True only once an admin approved the face scan (it is optional at sign-up and can be added later)
     faceVerified: { type: Boolean, default: false },
+    // Result of the FaceTec scan (the biometric data itself stays on the FaceTec host)
+    faceTecTid: { type: String, unique: true, sparse: true },
+    ageEstimate: Number,
+    // The one start-face-scan link that may still be completed (single use)
+    faceScanSession: { jti: String, startedAt: Date },
     face: {
       status: { type: String, enum: Object.values(FACE_STATUS), default: FACE_STATUS.NONE },
       image: String, // file in storage/kyc, never served statically
@@ -87,7 +92,11 @@ const userSchema = new mongoose.Schema(
       transform(doc, ret) {
         delete ret.password
         delete ret.emailVerification
-        if (ret.face) delete ret.face.image
+        if (ret.face) {
+          ret.face.hasImage = !!doc.face?.image // photos from before the FaceTec flow
+          delete ret.face.image
+        }
+        delete ret.faceScanSession
         delete ret.__v
         if (ret.twoFactor) {
           delete ret.twoFactor.secret

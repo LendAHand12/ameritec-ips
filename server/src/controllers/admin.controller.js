@@ -9,7 +9,7 @@ import { maskEmail, maskPhone } from '../utils/mask.js'
 import { sendAccountApprovedEmail, sendAccountRejectedEmail } from '../services/mail.service.js'
 import { describeAudit, investorOf } from '../services/audit.service.js'
 import { releasePendingCommissions } from '../services/commission.service.js'
-import { getWalletSummary } from '../models/WalletTransaction.js'
+import WalletTransaction, { getWalletSummary } from '../models/WalletTransaction.js'
 
 const userRecord = (u) => ({ type: 'user', id: u.id, ref: u.applicationId ?? u.referralCode ?? u.email })
 
@@ -371,4 +371,74 @@ export async function rejectFace(req, res) {
   user.faceVerified = false
   await user.save()
   res.json({ data: user })
+}
+
+const NETWORK_LEVELS = 3 // same depth the investor sees: F1 – F3
+const NETWORK_MAX_MEMBERS = 2000
+
+/** A user's downline down to F3, with what each member bought and the commission F1 purchases earned the user. */
+export async function getUserNetwork(req, res) {
+  const root = await findUserOrThrow(req.params.id, { allowDeleted: true })
+
+  const members = []
+  let parents = [root._id]
+  for (let level = 1; level <= NETWORK_LEVELS && parents.length && members.length < NETWORK_MAX_MEMBERS; level++) {
+    const rows = await User.find({ referredBy: { $in: parents }, deletedAt: null })
+      .select('fullName referralCode referredBy createdAt status accountStatus emailVerified faceVerified face.status')
+      .sort({ createdAt: -1 })
+      .limit(NETWORK_MAX_MEMBERS - members.length)
+      .lean()
+    rows.forEach((u) => members.push({ ...u, level }))
+    parents = rows.map((u) => u._id)
+  }
+
+  const ids = members.map((m) => m._id)
+  const [orders, commissions] = await Promise.all([
+    Order.aggregate([
+      { $match: { user: { $in: ids }, status: ORDER_STATUS.COMPLETED } },
+      { $group: { _id: '$user', cents: { $sum: '$amountCents' }, count: { $sum: 1 } } },
+    ]),
+    // Commission is paid on F1 purchases only: what each direct referral earned this user
+    WalletTransaction.aggregate([
+      { $match: { user: root._id, type: 'referral_commission', fromUser: { $in: ids } } },
+      { $group: { _id: { buyer: '$fromUser', status: '$status' }, cents: { $sum: '$amountCents' } } },
+    ]),
+  ])
+  const bought = Object.fromEntries(orders.map((o) => [String(o._id), o]))
+  const earned = {}
+  for (const c of commissions) {
+    const key = String(c._id.buyer)
+    earned[key] ??= { available: 0, pending: 0 }
+    earned[key][(c._id.status ?? 'available') === 'pending' ? 'pending' : 'available'] += c.cents
+  }
+
+  const items = members.map((m) => ({
+    id: String(m._id),
+    parentId: String(m.referredBy),
+    level: m.level,
+    fullName: m.fullName,
+    referralCode: m.referralCode,
+    joinedAt: m.createdAt,
+    kycStatus: m.status,
+    accountStatus: m.accountStatus,
+    emailVerified: !!m.emailVerified,
+    faceStatus: m.faceVerified ? FACE_STATUS.APPROVED : (m.face?.status ?? FACE_STATUS.NONE),
+    purchases: bought[String(m._id)]?.count ?? 0,
+    purchased: (bought[String(m._id)]?.cents ?? 0) / 100,
+    commission: m.level === 1 ? { available: (earned[String(m._id)]?.available ?? 0) / 100, pending: (earned[String(m._id)]?.pending ?? 0) / 100 } : null,
+  }))
+
+  res.json({
+    data: {
+      root: { id: root.id, fullName: root.fullName, referralCode: root.referralCode },
+      members: items,
+      summary: {
+        total: items.length,
+        levels: [1, 2, 3].map((l) => items.filter((m) => m.level === l).length),
+        buyers: items.filter((m) => m.purchases > 0).length,
+        purchased: items.reduce((s, m) => s + m.purchased, 0),
+        truncated: items.length >= NETWORK_MAX_MEMBERS,
+      },
+    },
+  })
 }

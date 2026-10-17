@@ -23,6 +23,7 @@ import AdminAuthLayout from '@/layouts/AdminAuthLayout'
 import AdminLayout from '@/layouts/AdminLayout'
 import AdminGuestRoute from '@/components/routes/AdminGuestRoute'
 import AdminPermissionRoute from '@/components/routes/AdminPermissionRoute'
+import KycCallbackPage from '@/pages/user/KycCallbackPage'
 import AdminReferralsPage from '@/pages/admin/AdminReferralsPage'
 import AdminAccountsPage from '@/pages/admin/AdminAccountsPage'
 import AdminProtectedRoute from '@/components/routes/AdminProtectedRoute'
@@ -71,6 +72,8 @@ const router = createBrowserRouter([
               { path: 'guide', element: <GuidePage /> },
               { path: 'support', element: <SupportPage /> },
               { path: 'account', element: <AccountPage /> },
+              // FaceTec sends the browser back here after the face scan
+              { path: 'user/kyc-callback', element: <KycCallbackPage /> },
             ],
           },
         ],
