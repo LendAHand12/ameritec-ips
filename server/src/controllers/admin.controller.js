@@ -11,6 +11,9 @@ import { describeAudit, investorOf } from '../services/audit.service.js'
 import { releasePendingCommissions } from '../services/commission.service.js'
 import { sendFaceImage } from '../services/facetec.service.js'
 import WalletTransaction, { getWalletSummary } from '../models/WalletTransaction.js'
+import { getSettings } from '../models/Setting.js'
+import { roundShares } from '../utils/shares.js'
+import { teamSales } from '../services/network.service.js'
 
 const userRecord = (u) => ({ type: 'user', id: u.id, ref: u.applicationId ?? u.referralCode ?? u.email })
 
@@ -139,22 +142,62 @@ export async function exportUsers(req, res) {
   res.send(csv)
 }
 
+/** Shares the user holds (completed orders), what they paid, current value, plus the prices/rates a manual order needs. */
+async function getHoldings(userId) {
+  const [settings, rows] = await Promise.all([
+    getSettings(),
+    Order.aggregate([
+      { $match: { user: userId, status: ORDER_STATUS.COMPLETED } },
+      { $group: { _id: '$shareType', shares: { $sum: '$shares' }, cents: { $sum: '$amountCents' }, orders: { $sum: 1 } } },
+    ]),
+  ])
+  const byClass = {}
+  let totalShares = 0
+  let totalInvested = 0
+  let totalValue = 0
+  for (const t of ['A', 'B']) {
+    const r = rows.find((x) => x._id === t)
+    const shares = roundShares(r?.shares ?? 0)
+    const price = settings.shares[t].priceCents / 100
+    byClass[t] = {
+      label: settings.shares[t].label,
+      shares,
+      orders: r?.orders ?? 0,
+      invested: (r?.cents ?? 0) / 100,
+      price,
+      value: Math.round(shares * settings.shares[t].priceCents) / 100,
+      commissionPct: settings.commissionPct[t],
+    }
+    totalShares += shares
+    totalInvested += byClass[t].invested
+    totalValue += byClass[t].value
+  }
+  return { ...byClass, totalShares: roundShares(totalShares), totalInvested, totalValue }
+}
+
 export async function getUser(req, res) {
   const user = await findUserOrThrow(req.params.id, { allowDeleted: true })
   await ensureApplicationId(user)
   await user.populate('referredBy', 'fullName email referralCode')
   await user.populate('reviewedBy', 'fullName email')
-  const wallet = await getWalletSummary(user._id)
+  const [wallet, holdings, adjustments] = await Promise.all([
+    getWalletSummary(user._id),
+    getHoldings(user._id),
+    WalletTransaction.find({ user: user._id, type: 'admin_adjustment' }).sort({ createdAt: -1 }).limit(5).populate('adjustedBy', 'fullName'),
+  ])
   res.json({
     data: {
       ...user.toJSON(),
       // Commission wallet, in USDT: what they can withdraw, what waits for KYC approval, what's been paid out
+      holdings,
       wallet: {
         available: wallet.availableCents / 100,
         pending: wallet.pendingCents / 100,
         requested: wallet.requestedCents / 100,
         withdrawn: wallet.withdrawnCents / 100,
         earned: wallet.earnedCents / 100,
+        adjusted: wallet.adjustmentCents / 100,
+        adjustments: adjustments.map((a) => ({ id: a.id, amount: a.amountCents / 100, reason: a.reason, by: a.adjustedBy?.fullName ?? null, date: a.createdAt })),
         address: user.withdrawalWallet?.address ?? null,
       },
     },
@@ -395,7 +438,8 @@ export async function getUserNetwork(req, res) {
   }
 
   const ids = members.map((m) => m._id)
-  const [orders, commissions] = await Promise.all([
+  const [sales, orders, commissions] = await Promise.all([
+    teamSales(root._id), // the whole downline, however deep, not just the F1–F3 listed below
     Order.aggregate([
       { $match: { user: { $in: ids }, status: ORDER_STATUS.COMPLETED } },
       { $group: { _id: '$user', cents: { $sum: '$amountCents' }, count: { $sum: 1 } } },
@@ -438,7 +482,11 @@ export async function getUserNetwork(req, res) {
         total: items.length,
         levels: [1, 2, 3].map((l) => items.filter((m) => m.level === l).length),
         buyers: items.filter((m) => m.purchases > 0).length,
-        purchased: items.reduce((s, m) => s + m.purchased, 0),
+        // Team sales: USDT the whole downline has paid (all levels), per level for F1–F3 and for F4 and deeper
+        purchased: sales.totalCents / 100,
+        purchasedByLevel: sales.levelCents.map((c) => c / 100),
+        purchasedDeeper: sales.deeperCents / 100,
+        downlineTotal: sales.members,
         truncated: items.length >= NETWORK_MAX_MEMBERS,
       },
     },

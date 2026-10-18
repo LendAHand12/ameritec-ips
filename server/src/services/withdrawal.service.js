@@ -2,13 +2,14 @@ import env from '../config/env.js'
 import User, { ACCOUNT_STATUS, USER_STATUS } from '../models/User.js'
 import Withdrawal from '../models/Withdrawal.js'
 import { getBalanceCents } from '../models/WalletTransaction.js'
+import { getSettings } from '../models/Setting.js'
 import ApiError from '../utils/ApiError.js'
 import { fromCents } from '../utils/money.js'
 import { verifyTwoFactorCode } from './twoFactor.service.js'
 import { notifyWithdrawalRequested } from './telegram.service.js'
 
 export const BEP20_ADDRESS = /^0x[0-9a-fA-F]{40}$/
-export const minWithdrawalCents = () => Math.round(env.withdrawal.minUsdt * 100)
+export const minWithdrawalCents = (settings) => Math.round((settings?.withdrawal?.minUsdt ?? env.withdrawal.minUsdt) * 100)
 
 /** Sensitive actions (saving a wallet, withdrawing) need a fresh authenticator code. */
 export async function assertTwoFactor(userId, code) {
@@ -47,8 +48,10 @@ export async function requestWithdrawal(user, amountCents) {
   }
   const address = user.withdrawalWallet?.address
   if (!address) throw new ApiError(400, 'Add a withdrawal wallet first', { address: 'No withdrawal wallet saved' }, 'NO_WALLET')
-  if (amountCents < minWithdrawalCents()) {
-    const msg = `Minimum withdrawal is ${fromCents(minWithdrawalCents()).toFixed(2)} USDT`
+  const settings = await getSettings()
+  const minCents = minWithdrawalCents(settings)
+  if (amountCents < minCents) {
+    const msg = `Minimum withdrawal is ${fromCents(minCents).toFixed(2)} USDT`
     throw new ApiError(400, msg, { amount: msg })
   }
   if (amountCents > (await getBalanceCents(user._id))) {

@@ -110,6 +110,13 @@ export default function OrderReviewDialog({ orderId, onClose, onChanged }) {
               <h3 className="mb-1 text-sm font-semibold">Payment</h3>
               <dl>
                 <Row label="Method">{order.paymentMethod ? PAYMENT_METHOD_LABEL[order.paymentMethod] : 'Not paid yet'}</Row>
+                {order.manual && (
+                  <Row label="Created manually">
+                    By an admin · referral commission {order.manual.commissionPaid ? 'paid' : 'not paid'}
+                    {order.manual.reference && <span className="block text-muted-foreground">Reference: {order.manual.reference}</span>}
+                    {order.manual.note && <span className="block text-muted-foreground">{order.manual.note}</span>}
+                  </Row>
+                )}
                 {order.txHash && (
                   <Row label="Tx hash">
                     <a href={bscscanTxUrl(order.txHash)} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 break-all text-primary hover:underline">

@@ -46,7 +46,7 @@ async function payReferralCommission(order) {
 }
 
 /** Atomically moves an open order to completed (only once) and pays the commission. */
-export async function completeOrder(orderId, { by = 'system', adminId } = {}) {
+export async function completeOrder(orderId, { by = 'system', adminId, payCommission = true } = {}) {
   const order = await Order.findOneAndUpdate(
     { _id: orderId, status: { $in: OPEN_STATUSES } },
     {
@@ -59,7 +59,7 @@ export async function completeOrder(orderId, { by = 'system', adminId } = {}) {
     },
     { new: true },
   )
-  if (order) await payReferralCommission(order)
+  if (order && payCommission) await payReferralCommission(order)
   return order
 }
 

@@ -26,6 +26,8 @@ const settingsSnapshot = (s) => ({
   ),
   'Minimum first purchase (USDT)': fromCents(s.minPurchaseCents.first),
   'Minimum later purchase (USDT)': fromCents(s.minPurchaseCents.next),
+  'Withdrawal mode': s.withdrawal.mode,
+  'Minimum withdrawal (USDT)': s.withdrawal.minUsdt,
   'USDT (BEP20) enabled': s.payment.bep20.enabled,
   'BEP20 wallet address': s.payment.bep20.address,
   'Zelle enabled': s.payment.zelle.enabled,
@@ -38,6 +40,7 @@ const toAdminOrderDto = (o) => ({
   ...toOrderDto(o),
   user: o.user && { id: o.user.id, fullName: o.user.fullName, email: o.user.email, phone: o.user.phone, referralCode: o.user.referralCode },
   completedBy: o.completedBy ?? null,
+  manual: o.manual?.createdBy ? { reference: o.manual.reference ?? null, note: o.manual.note ?? null, commissionPaid: !!o.manual.commissionPaid } : null,
   // Background on-chain audit of an instantly-completed wallet payment
   chainCheck: o.chainCheck?.state ? { state: o.chainCheck.state, reason: o.chainCheck.reason ?? null } : null,
   certificate: o.certificate?.filename ? { originalName: o.certificate.originalName, uploadedAt: o.certificate.uploadedAt } : null,
@@ -152,6 +155,7 @@ const settingsDto = (s) => ({
     ]),
   ),
   minPurchase: { first: fromCents(s.minPurchaseCents.first), next: fromCents(s.minPurchaseCents.next) },
+  withdrawal: { mode: s.withdrawal.mode, minUsdt: s.withdrawal.minUsdt },
   payment: {
     bep20: { enabled: s.payment.bep20.enabled, address: s.payment.bep20.address },
     zelle: {
@@ -167,7 +171,10 @@ export async function getSettingsHandler(req, res) {
 }
 
 export async function updateSettings(req, res) {
-  const { shares, minPurchase, payment } = req.body
+  const { shares, minPurchase, payment, withdrawal } = req.body
+  if (withdrawal?.mode === 'auto') {
+    throw new ApiError(400, 'Automatic withdrawals are not available yet. Use manual processing for now.', { 'withdrawal.mode': 'Not available yet' })
+  }
   if (payment.bep20.enabled && !payment.bep20.address) {
     throw new ApiError(400, 'Enter the receiving wallet address to enable USDT payments', { 'payment.bep20.address': 'Required when enabled' })
   }
@@ -186,6 +193,10 @@ export async function updateSettings(req, res) {
   }
   settings.minPurchaseCents.first = toCents(minPurchase.first)
   settings.minPurchaseCents.next = toCents(minPurchase.next)
+  if (withdrawal) {
+    settings.withdrawal.mode = withdrawal.mode
+    settings.withdrawal.minUsdt = withdrawal.minUsdt
+  }
   settings.payment.bep20.enabled = payment.bep20.enabled
   settings.payment.bep20.address = payment.bep20.address
   settings.payment.zelle.enabled = payment.zelle.enabled

@@ -207,6 +207,7 @@ function WithdrawDialog({ open, wallet, onClose, onDone }) {
             <p className="text-muted-foreground">Paid to</p>
             <p className="pt-0.5 font-mono font-semibold break-all">{wallet.address}</p>
             <p className="pt-1 text-muted-foreground">{wallet.token} · {wallet.network} · no fee</p>
+            {wallet.withdrawalMode !== 'auto' && <p className="pt-1 text-muted-foreground">Requests are reviewed and sent by our team manually — you’ll be notified once it’s paid.</p>}
           </div>
           <ConfirmIdentity twoFactor={twoFactor} value={code} onChange={(v) => { setCode(v); setErrors((x) => ({ ...x, code: undefined })) }} error={errors.code} disabled={saving} />
           <DialogFooter>
@@ -379,6 +380,29 @@ export default function CommissionWallet({ onChanged }) {
           </Button>
         </div>
       </div>
+
+      {wallet.adjustments?.length > 0 && (
+        <div>
+          <h3 className="text-title font-bold">Balance adjustments</h3>
+          <p className="pt-0.5 text-caption text-muted-foreground">Changes our team made to your balance, with the reason.</p>
+          <ul className="mt-2 divide-y divide-divider rounded-lg border">
+            {wallet.adjustments.map((a) => (
+              <li key={a.id} className="flex flex-wrap items-center gap-x-4 gap-y-1 px-3.5 py-3 text-caption">
+                <div className="min-w-0 flex-1">
+                  <p className="font-semibold">{a.amount >= 0 ? 'Added to your balance' : 'Deducted from your balance'}</p>
+                  <p className="text-muted-foreground">
+                    {formatDate(a.date)} · {a.reason}
+                  </p>
+                </div>
+                <span className={cn('text-title font-bold tabular-nums', a.amount >= 0 ? 'text-success' : 'text-danger')}>
+                  {a.amount >= 0 ? '+' : '−'}
+                  {formatUsdt(Math.abs(a.amount))} USDT
+                </span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
 
       {wallet.withdrawals.length > 0 && (
         <div>

@@ -8,6 +8,6 @@ export const ORDER_STATUS = {
   cancelled: { label: 'Cancelled', tone: 'neutral' },
 }
 
-export const PAYMENT_METHOD_LABEL = { bep20: 'USDT (BEP20)', zelle: 'Zelle' }
+export const PAYMENT_METHOD_LABEL = { bep20: 'USDT (BEP20)', zelle: 'Zelle', other: 'Other' }
 
 export const bscscanTxUrl = (hash) => `https://bscscan.com/tx/${hash}`

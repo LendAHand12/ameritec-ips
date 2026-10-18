@@ -1,5 +1,6 @@
 import { Router } from 'express'
 import * as admin from '../controllers/admin.controller.js'
+import * as adminUsers from '../controllers/adminManualOrder.controller.js'
 import * as adminAuth from '../controllers/adminAuth.controller.js'
 import * as adminReferrals from '../controllers/adminReferrals.controller.js'
 import * as adminOverview from '../controllers/adminOverview.controller.js'
@@ -23,11 +24,12 @@ import {
   updateTicketSchema,
 } from '../validators/support.validator.js'
 import { createAdminSchema, resetAdminPasswordSchema, updateAdminSchema } from '../validators/adminAccounts.validator.js'
-import { listAdminOrdersQuerySchema, rejectOrderSchema, updateSettingsSchema } from '../validators/adminTrade.validator.js'
+import { listAdminOrdersQuerySchema, manualOrderSchema, rejectOrderSchema, updateSettingsSchema } from '../validators/adminTrade.validator.js'
 import {
   adminLoginSchema,
   exportUsersQuerySchema,
   listUsersQuerySchema,
+  adjustBalanceSchema,
   changeReferrerSchema,
   rejectFaceSchema,
   listWithdrawalsQuerySchema,
@@ -65,6 +67,7 @@ router.patch('/admins/:id/password', requireSuperAdmin, act('admin.password_rese
 router.get('/overview', requirePermission('overview:view'), validate(overviewQuerySchema, 'query'), adminOverview.getOverview)
 
 // Referral & commission (read-only)
+router.post('/users/:id/balance-adjustment', requirePermission('referrals:manage'), act('wallet.adjust'), validate(adjustBalanceSchema), adminReferrals.adjustBalance)
 router.get('/referrals/summary', requirePermission('referrals:view'), validate(referralSummaryQuerySchema, 'query'), adminReferrals.getSummary)
 router.get('/referrals/commissions', requirePermission('referrals:view'), validate(listReferralCommissionsQuerySchema, 'query'), adminReferrals.listCommissions)
 router.get('/referrals/withdrawals', requirePermission('referrals:view'), validate(listWithdrawalsQuerySchema, 'query'), adminReferrals.listWithdrawals)
@@ -82,6 +85,7 @@ router.patch('/users/:id/approve', requirePermission('users:manage'), act('user.
 router.patch('/users/:id/reject', requirePermission('users:manage'), act('user.reject'), validate(rejectUserSchema), admin.rejectUser)
 router.patch('/users/:id/lock', requirePermission('users:manage'), act('user.lock'), validate(lockUserSchema), admin.lockUser)
 router.patch('/users/:id/unlock', requirePermission('users:manage'), act('user.unlock'), admin.unlockUser)
+router.post('/users/:id/manual-order', requirePermission('orders:manage'), act('order.manual'), validate(manualOrderSchema), adminUsers.createManualOrder)
 router.patch('/users/:id/face/approve', requirePermission('users:manage'), act('user.face_approve'), admin.approveFace)
 router.patch('/users/:id/face/reject', requirePermission('users:manage'), act('user.face_reject'), validate(rejectFaceSchema), admin.rejectFace)
 router.patch('/users/:id/verify-email', requirePermission('users:manage'), act('user.verify_email'), admin.verifyUserEmail)

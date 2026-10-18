@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { ExternalLinkIcon, LockIcon, ScanFaceIcon, LockOpenIcon, MailCheckIcon, MailWarningIcon, PencilIcon, Trash2Icon } from 'lucide-react'
+import { ExternalLinkIcon, LockIcon, PlusIcon, ScanFaceIcon, LockOpenIcon, MailCheckIcon, MailWarningIcon, PencilIcon, Trash2Icon } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
@@ -7,10 +7,12 @@ import { Spinner } from '@/components/ui/spinner'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { useAdminAuth } from '@/hooks/useAdminAuth'
+import AdjustBalanceDialog from '@/components/admin/AdjustBalanceDialog'
+import ManualPurchaseDialog from '@/components/admin/ManualPurchaseDialog'
 import UserNetwork from '@/components/admin/UserNetwork'
 import StatusBadge from '@/components/dashboard/StatusBadge'
 import { ACCOUNT_STATUS, DOCUMENT_TYPE_LABEL, KYC_STATUS } from '@/lib/adminUsers'
-import { formatDate, formatDateTime, formatUsdt } from '@/lib/format'
+import { formatDate, formatDateTime, formatShares, formatUsdt } from '@/lib/format'
 import * as adminService from '@/services/admin.service'
 
 function Row({ label, children }) {
@@ -51,6 +53,8 @@ export default function UserReviewDialog({ userId, onClose, onChanged }) {
   const [busy, setBusy] = useState(null)
   const [mode, setMode] = useState(null) // 'reject' | 'lock' | 'delete' | 'faceReject' while asking for a reason
   const [editingReferrer, setEditingReferrer] = useState(false)
+  const [buying, setBuying] = useState(false)
+  const [adjusting, setAdjusting] = useState(false)
   const [confirmingVerify, setConfirmingVerify] = useState(false)
   const [referrerCode, setReferrerCode] = useState('')
   const [reason, setReason] = useState('')
@@ -93,6 +97,11 @@ export default function UserReviewDialog({ userId, onClose, onChanged }) {
   const account = user && ACCOUNT_STATUS[user.accountStatus]
   const locked = user?.accountStatus === 'locked'
   const deleted = !!user?.deletedAt
+  const canBuy = can('orders:manage') && !deleted && user?.status === 'approved'
+
+  /** Reload the profile (holdings and wallet) after something that changes them. */
+  const reloadUser = () =>
+    adminService.getUser(currentId).then(({ data }) => setUser(data)).catch(() => {})
 
   const saveReferrer = async () => {
     setBusy('referrer')
@@ -186,11 +195,59 @@ export default function UserReviewDialog({ userId, onClose, onChanged }) {
               </dl>
             </div>
 
+            {user.holdings && (
+              <section className="rounded-lg border">
+                <div className="flex flex-wrap items-center justify-between gap-2 border-b bg-muted/50 px-3.5 py-2.5">
+                  <h3 className="text-sm font-semibold">Share holdings</h3>
+                  {can('orders:manage') && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      disabled={!canBuy}
+                      title={canBuy ? undefined : 'Only KYC-approved users can hold shares'}
+                      onClick={() => setBuying(true)}
+                    >
+                      <PlusIcon />
+                      Manual purchase
+                    </Button>
+                  )}
+                </div>
+                <dl className="grid grid-cols-1 gap-px bg-border sm:grid-cols-3">
+                  {[
+                    ['Class A', user.holdings.A],
+                    ['Class B', user.holdings.B],
+                  ].map(([label, h]) => (
+                    <div key={label} className="bg-card px-3.5 py-3">
+                      <dt className="text-caption text-muted-foreground">{label}</dt>
+                      <dd className="pt-0.5 text-title font-bold tabular-nums">{formatShares(h.shares)} <span className="text-caption font-medium text-muted-foreground">shares</span></dd>
+                      <dd className="text-caption text-muted-foreground tabular-nums">
+                        Invested {formatUsdt(h.invested)} · Value {formatUsdt(h.value)} USDT
+                      </dd>
+                    </div>
+                  ))}
+                  <div className="bg-muted/40 px-3.5 py-3">
+                    <dt className="text-caption text-muted-foreground">Total</dt>
+                    <dd className="pt-0.5 text-title font-bold tabular-nums">{formatShares(user.holdings.totalShares)} <span className="text-caption font-medium text-muted-foreground">shares</span></dd>
+                    <dd className="text-caption text-muted-foreground tabular-nums">
+                      Invested {formatUsdt(user.holdings.totalInvested)} · Value {formatUsdt(user.holdings.totalValue)} USDT
+                    </dd>
+                  </div>
+                </dl>
+              </section>
+            )}
+
             {user.wallet && (
               <section className="rounded-lg border">
-                <div className="flex items-center justify-between gap-3 border-b bg-muted/50 px-3.5 py-2.5">
-                  <h3 className="text-sm font-semibold">Commission wallet</h3>
-                  <span className="text-caption text-muted-foreground">USDT</span>
+                <div className="flex flex-wrap items-center justify-between gap-2 border-b bg-muted/50 px-3.5 py-2.5">
+                  <h3 className="text-sm font-semibold">
+                    Commission wallet <span className="text-caption font-normal text-muted-foreground">USDT</span>
+                  </h3>
+                  {can('referrals:manage') && !deleted && (
+                    <Button size="sm" variant="outline" onClick={() => setAdjusting(true)}>
+                      <PencilIcon />
+                      Adjust balance
+                    </Button>
+                  )}
                 </div>
                 <dl className="grid grid-cols-2 gap-px bg-border sm:grid-cols-4">
                   {[
@@ -209,6 +266,25 @@ export default function UserReviewDialog({ userId, onClose, onChanged }) {
                   Total earned <span className="font-semibold text-foreground">{formatUsdt(user.wallet.earned)} USDT</span> · Withdrawal wallet:{' '}
                   {user.wallet.address ? <span className="font-mono break-all text-foreground">{user.wallet.address}</span> : <span>not set</span>}
                 </p>
+                {user.wallet.adjustments?.length > 0 && (
+                  <div className="border-t px-3.5 py-2.5">
+                    <p className="pb-1 text-caption font-semibold">Recent balance adjustments</p>
+                    <ul className="space-y-1">
+                      {user.wallet.adjustments.map((a) => (
+                        <li key={a.id} className="flex flex-wrap items-baseline justify-between gap-x-3 text-caption">
+                          <span className="min-w-0 flex-1 text-muted-foreground">
+                            {formatDate(a.date)} · {a.reason}
+                            {a.by && <span> — {a.by}</span>}
+                          </span>
+                          <span className={`font-bold tabular-nums ${a.amount >= 0 ? 'text-success' : 'text-danger'}`}>
+                            {a.amount >= 0 ? '+' : '−'}
+                            {formatUsdt(Math.abs(a.amount))}
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
               </section>
             )}
 
@@ -417,6 +493,29 @@ export default function UserReviewDialog({ userId, onClose, onChanged }) {
           </>
         )}
       </DialogContent>
+      {user && adjusting && (
+        <AdjustBalanceDialog
+          user={user}
+          onClose={() => setAdjusting(false)}
+          onDone={() => {
+            setAdjusting(false)
+            reloadUser()
+            onChanged?.()
+          }}
+        />
+      )}
+      {user && buying && (
+        <ManualPurchaseDialog
+          open
+          user={user}
+          onClose={() => setBuying(false)}
+          onCreated={() => {
+            setBuying(false)
+            reloadUser()
+            onChanged?.()
+          }}
+        />
+      )}
     </Dialog>
   )
 }

@@ -5,12 +5,12 @@ import User, { ACCOUNT_STATUS, USER_STATUS } from '../models/User.js'
 import WalletTransaction from '../models/WalletTransaction.js'
 import { toCsv } from '../utils/csv.js'
 import { fromCents } from '../utils/money.js'
-import env from '../config/env.js'
 import Withdrawal from '../models/Withdrawal.js'
 import { getWalletSummary } from '../models/WalletTransaction.js'
 import { toCents } from '../utils/money.js'
 import { roundShares } from '../utils/shares.js'
 import { assertSensitiveAuth, requestWithdrawal } from '../services/withdrawal.service.js'
+import { teamSales } from '../services/network.service.js'
 
 const MAX_LEVELS = 3 // network is shown down to F3; commission is paid on F1 only
 const MAX_MEMBERS = 5000
@@ -104,6 +104,9 @@ export async function getSummary(req, res) {
     getWalletSummary(userId),
   ])
 
+  // Sales: what the WHOLE downline (every level, not just F1–F3) has paid for completed purchases
+  const sales = await teamSales(userId)
+
   const monthStart = new Date(new Date().getFullYear(), new Date().getMonth(), 1)
   const byLevel = [1, 2, 3].map((l) => network.filter((m) => m.level === l).length)
   const shares = Object.fromEntries(f1Orders.map((s) => [s._id, s.shares]))
@@ -115,6 +118,13 @@ export async function getSummary(req, res) {
       newThisMonth: network.filter((m) => new Date(m.joinedAt) >= monthStart).length,
       active: network.filter((m) => m.active).length,
       levels: { f1: byLevel[0], f2: byLevel[1], f3: byLevel[2] },
+    },
+    teamSales: {
+      total: fromCents(sales.totalCents),
+      f1: fromCents(sales.levelCents[0]),
+      f2: fromCents(sales.levelCents[1]),
+      f3: fromCents(sales.levelCents[2]),
+      deeper: fromCents(sales.deeperCents), // F4 and below
     },
     commission: {
       // earned = everything credited; only "available" can be withdrawn, "pending" waits for the buyer's face scan
@@ -209,7 +219,12 @@ const toWithdrawalDto = (w) => ({
 
 /** Balances (withdrawable / held for referrals' face scans / requested / paid), whether the user may withdraw, the saved wallet and the latest withdrawals. */
 export async function getWallet(req, res) {
-  const [wallet, recent] = await Promise.all([getWalletSummary(req.user._id), Withdrawal.find({ user: req.user._id }).sort({ createdAt: -1 }).limit(5)])
+  const [settings, wallet, recent, adjustments] = await Promise.all([
+    getSettings(),
+    getWalletSummary(req.user._id),
+    Withdrawal.find({ user: req.user._id }).sort({ createdAt: -1 }).limit(5),
+    WalletTransaction.find({ user: req.user._id, type: 'admin_adjustment' }).sort({ createdAt: -1 }).limit(5),
+  ])
   res.json({
     balance: {
       available: fromCents(wallet.availableCents),
@@ -224,8 +239,12 @@ export async function getWallet(req, res) {
     faceStatus: req.user.faceVerified ? 'approved' : (req.user.face?.status ?? 'none'),
     network: 'BNB Smart Chain (BEP20)',
     token: 'USDT',
-    minWithdrawal: env.withdrawal.minUsdt,
+    minWithdrawal: settings.withdrawal.minUsdt,
+    // 'manual': an admin sends the USDT by hand after the request is created ('auto' is planned)
+    withdrawalMode: settings.withdrawal.mode,
     withdrawals: recent.map(toWithdrawalDto),
+    // Manual changes made by an admin, with the reason, so a balance never moves without an explanation
+    adjustments: adjustments.map((a) => ({ id: a.id, amount: fromCents(a.amountCents), reason: a.reason, date: a.createdAt })),
   })
 }
 

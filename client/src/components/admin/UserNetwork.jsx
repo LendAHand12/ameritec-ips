@@ -48,10 +48,33 @@ function Body({ userId, onOpenUser }) {
             setPage(1)
           }}
         />
-        <p className="text-caption text-muted-foreground">
-          <span className="font-semibold text-foreground">{formatInt(summary.buyers)}</span> bought · {formatUsdt(summary.purchased)} USDT purchased
+        <p className="text-right text-caption text-muted-foreground">
+          <span className="font-semibold text-foreground">{formatInt(summary.buyers)}</span> of {formatInt(summary.total)} bought
         </p>
       </div>
+
+      {/* Sales: what the downline has paid in */}
+      <div className="grid grid-cols-2 gap-px overflow-hidden rounded-lg border bg-border sm:grid-cols-5">
+        <div className="bg-primary-soft/50 px-3 py-2.5">
+          <p className="text-caption text-muted-foreground">Team sales</p>
+          <p className="text-title font-bold tabular-nums">{formatUsdt(summary.purchased)} <span className="text-caption font-medium text-muted-foreground">USDT</span></p>
+        </div>
+        {summary.purchasedByLevel.map((v, i) => (
+          <div key={i} className="bg-card px-3 py-2.5">
+            <p className="text-caption text-muted-foreground">F{i + 1} sales</p>
+            <p className="text-title font-bold tabular-nums">{formatUsdt(v)}</p>
+          </div>
+        ))}
+        <div className="bg-card px-3 py-2.5">
+          <p className="text-caption text-muted-foreground">F4+ sales</p>
+          <p className="text-title font-bold tabular-nums">{formatUsdt(summary.purchasedDeeper ?? 0)}</p>
+        </div>
+      </div>
+      {summary.downlineTotal > summary.total && (
+        <p className="text-caption text-muted-foreground">
+          Team sales cover the whole downline ({formatInt(summary.downlineTotal)} people at every level); the list below shows F1–F3.
+        </p>
+      )}
 
       <div className="overflow-x-auto rounded-lg border">
         <table className="w-full min-w-[640px] border-collapse text-caption">
@@ -164,7 +187,7 @@ export default function UserNetwork({ userId, onOpenUser }) {
         <span className="flex items-center gap-2 text-sm font-semibold">
           <NetworkIcon className="size-4" />
           Referral network
-          <span className="text-caption font-normal text-muted-foreground">F1 – F3 downline</span>
+          <span className="text-caption font-normal text-muted-foreground">F1 – F3 listed · sales count every level</span>
         </span>
         <ChevronDownIcon className={cn('size-4 text-muted-foreground transition-transform', open && 'rotate-180')} />
       </button>

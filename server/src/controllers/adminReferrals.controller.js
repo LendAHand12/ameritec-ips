@@ -3,8 +3,8 @@ import Withdrawal, { WITHDRAWAL_STATUS } from '../models/Withdrawal.js'
 import ApiError from '../utils/ApiError.js'
 import { describeAudit, investorOf } from '../services/audit.service.js'
 import User from '../models/User.js'
-import WalletTransaction, { COMMISSION_STATUS } from '../models/WalletTransaction.js'
-import { fromCents } from '../utils/money.js'
+import WalletTransaction, { COMMISSION_STATUS, getBalanceCents } from '../models/WalletTransaction.js'
+import { fromCents, toCents } from '../utils/money.js'
 
 const DAY = 24 * 60 * 60 * 1000
 const TIME_ZONE = Intl.DateTimeFormat().resolvedOptions().timeZone
@@ -129,7 +129,7 @@ export async function listReferrers(req, res) {
 
   const pipeline = [
     { $match: { referredBy: { $ne: null }, deletedAt: null } },
-    { $group: { _id: '$referredBy', referred: { $sum: 1 }, approved: { $sum: { $cond: [{ $eq: ['$status', 'approved'] }, 1, 0] } } } },
+    { $group: { _id: '$referredBy', referred: { $sum: 1 }, approved: { $sum: { $cond: [{ $eq: ['$status', 'approved'] }, 1, 0] } }, members: { $push: '$_id' } } },
     { $lookup: { from: 'users', localField: '_id', foreignField: '_id', as: 'user', pipeline: [{ $project: { fullName: 1, referralCode: 1, status: 1, accountStatus: 1, deletedAt: 1 } }] } },
     { $unwind: '$user' },
     { $match: { 'user.deletedAt': null } },
@@ -148,8 +148,21 @@ export async function listReferrers(req, res) {
         pipeline: [{ $match: COMMISSION }, { $group: { _id: '$status', cents: { $sum: '$amountCents' } } }],
       },
     },
+    // Sales: what the direct referrals (F1) have paid for completed purchases
+    {
+      $lookup: {
+        from: 'orders',
+        let: { ids: '$members' },
+        pipeline: [
+          { $match: { $expr: { $and: [{ $in: ['$user', '$$ids'] }, { $eq: ['$status', 'completed'] }] } } },
+          { $group: { _id: null, cents: { $sum: '$amountCents' } } },
+        ],
+        as: 'sales',
+      },
+    },
     {
       $addFields: {
+        directSalesCents: { $ifNull: [{ $first: '$sales.cents' }, 0] },
         availableCents: { $sum: { $map: { input: { $filter: { input: '$ledger', cond: { $ne: ['$$this._id', COMMISSION_STATUS.PENDING] } } }, in: '$$this.cents' } } },
         pendingCents: { $sum: { $map: { input: { $filter: { input: '$ledger', cond: { $eq: ['$$this._id', COMMISSION_STATUS.PENDING] } } }, in: '$$this.cents' } } },
       },
@@ -158,7 +171,24 @@ export async function listReferrers(req, res) {
     { $sort: { totalCents: -1, referred: -1 } },
   )
 
-  const [result] = await User.aggregate([...pipeline, { $facet: { items: [{ $skip: (page - 1) * limit }, { $limit: limit }], total: [{ $count: 'n' }] } }])
+  // Team sales (all levels) is only computed for the rows on this page
+  const teamSalesStages = [
+    { $graphLookup: { from: 'users', startWith: '$_id', connectFromField: '_id', connectToField: 'referredBy', as: 'downline' } },
+    {
+      $lookup: {
+        from: 'orders',
+        let: { ids: { $map: { input: '$downline', as: 'd', in: '$$d._id' } } },
+        pipeline: [
+          { $match: { $expr: { $and: [{ $in: ['$user', '$$ids'] }, { $eq: ['$status', 'completed'] }] } } },
+          { $group: { _id: null, cents: { $sum: '$amountCents' } } },
+        ],
+        as: 'teamSales',
+      },
+    },
+    { $addFields: { teamSalesCents: { $ifNull: [{ $first: '$teamSales.cents' }, 0] }, teamMembers: { $size: '$downline' } } },
+    { $project: { downline: 0, teamSales: 0, members: 0, ledger: 0, sales: 0 } },
+  ]
+  const [result] = await User.aggregate([...pipeline, { $facet: { items: [{ $skip: (page - 1) * limit }, { $limit: limit }, ...teamSalesStages], total: [{ $count: 'n' }] } }])
   const total = result.total[0]?.n ?? 0
 
   res.json({
@@ -170,6 +200,9 @@ export async function listReferrers(req, res) {
       accountStatus: r.user.accountStatus,
       referred: r.referred,
       referredApproved: r.approved,
+      directSales: fromCents(r.directSalesCents),
+      teamSales: fromCents(r.teamSalesCents ?? 0),
+      teamMembers: r.teamMembers ?? 0,
       available: fromCents(r.availableCents),
       pending: fromCents(r.pendingCents),
       total: fromCents(r.totalCents),
@@ -235,3 +268,47 @@ export const markWithdrawalPaid = (req, res) =>
 /** Declined: the amount goes straight back to the user's available balance. */
 export const rejectWithdrawal = (req, res) =>
   settle(req, res, { status: WITHDRAWAL_STATUS.REJECTED, rejectionReason: req.body.reason }, (w) => `Rejected ${w.code}: ${w.rejectionReason}`)
+
+// ---- Balance adjustments ----
+
+/**
+ * Adds to or deducts from a user's withdrawable commission balance. The reason is mandatory, is stored in the
+ * ledger and audit log, and is shown to the user. The balance can never be pushed below zero.
+ */
+export async function adjustBalance(req, res) {
+  describeAudit(req, { record: { type: 'user', id: req.params.id } })
+  const { direction, amount, reason } = req.body
+  const user = await User.findById(req.params.id)
+  if (!user) throw new ApiError(404, 'User not found')
+  if (user.deletedAt) throw new ApiError(409, 'This user has been deleted')
+
+  const deltaCents = (direction === 'add' ? 1 : -1) * toCents(amount)
+  const before = await getBalanceCents(user._id)
+  if (before + deltaCents < 0) {
+    const msg = `Can’t deduct more than the available balance (${fromCents(before).toFixed(2)} USDT)`
+    throw new ApiError(400, msg, { amount: msg })
+  }
+
+  const entry = await WalletTransaction.create({
+    user: user._id,
+    type: 'admin_adjustment',
+    amountCents: deltaCents,
+    status: COMMISSION_STATUS.AVAILABLE,
+    reason,
+    adjustedBy: req.admin._id,
+  })
+  // Two admins deducting at once could both pass the check above: back this one out if we are now overdrawn
+  const after = await getBalanceCents(user._id)
+  if (after < 0) {
+    await WalletTransaction.deleteOne({ _id: entry._id })
+    throw new ApiError(409, 'The balance changed at the same time. Please check it and try again.')
+  }
+
+  describeAudit(req, {
+    investor: investorOf(user),
+    record: { type: 'user', id: user.id, ref: user.referralCode },
+    description: `${direction === 'add' ? 'Added' : 'Deducted'} ${amount} USDT ${direction === 'add' ? 'to' : 'from'} ${user.fullName}'s balance: ${reason}`,
+    changes: [{ field: 'Commission balance (USDT)', from: fromCents(before), to: fromCents(after) }],
+  })
+  res.status(201).json({ data: { before: fromCents(before), after: fromCents(after), change: fromCents(deltaCents) } })
+}

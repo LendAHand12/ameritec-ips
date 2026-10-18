@@ -32,6 +32,8 @@ export const rejectUser = (id, reason) => api.patch(`/admin/users/${id}/reject`,
 export const lockUser = (id, reason) => api.patch(`/admin/users/${id}/lock`, { reason })
 export const unlockUser = (id) => api.patch(`/admin/users/${id}/unlock`)
 export const getUserNetwork = (id) => api.get(`/admin/users/${id}/network`)
+export const adjustBalance = (userId, data) => api.post(`/admin/users/${userId}/balance-adjustment`, data)
+export const createManualOrder = (userId, data) => api.post(`/admin/users/${userId}/manual-order`, data)
 export const approveFace = (id) => api.patch(`/admin/users/${id}/face/approve`)
 export const rejectFace = (id, reason) => api.patch(`/admin/users/${id}/face/reject`, { reason })
 export const verifyUserEmail = (id) => api.patch(`/admin/users/${id}/verify-email`)

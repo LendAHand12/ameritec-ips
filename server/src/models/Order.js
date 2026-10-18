@@ -1,7 +1,8 @@
 import mongoose from 'mongoose'
 
 export const SHARE_TYPES = ['A', 'B']
-export const PAYMENT_METHODS = ['bep20', 'zelle']
+// 'other' is only used by manual orders (e.g. a bank transfer an admin confirmed outside the system)
+export const PAYMENT_METHODS = ['bep20', 'zelle', 'other']
 export const ORDER_STATUS = {
   AWAITING_PAYMENT: 'awaiting_payment', // created, user hasn't paid yet
   PAYING: 'paying', // user picked USDT and is paying from their wallet
@@ -29,6 +30,13 @@ const orderSchema = new mongoose.Schema(
     // Tx hash of an unfinished order whose user was deleted; freed so it can be used again
     releasedTxHash: String,
     paymentError: String,
+    // Set when an admin created the order by hand (money received, but the order never reached the system)
+    manual: {
+      createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'Admin' },
+      reference: String, // tx hash / Zelle confirmation / bank reference
+      note: String,
+      commissionPaid: Boolean, // whether the referrer was paid for this order
+    },
     // Background audit of a wallet payment that was accepted instantly; only used to alert admins
     chainCheck: {
       state: { type: String, enum: ['pending', 'verified', 'invalid'] },

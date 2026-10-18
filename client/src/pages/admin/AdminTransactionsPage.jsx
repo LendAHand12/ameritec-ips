@@ -197,6 +197,11 @@ export default function AdminTransactionsPage() {
                       <StatusBadge tone={status.tone} icon={false}>
                         {status.label}
                       </StatusBadge>
+                      {o.manual && (
+                        <span className="ml-2 rounded-md bg-muted px-1.5 py-0.5 text-caption font-semibold text-muted-foreground" title="Created by hand by an admin">
+                          Manual
+                        </span>
+                      )}
                     </td>
                     <td className={`${td} text-caption`}>
                       {o.status !== 'completed' ? (

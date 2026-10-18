@@ -74,6 +74,13 @@ export const markWithdrawalPaidSchema = z.object({
 
 export const rejectWithdrawalSchema = z.object({ reason: z.string().trim().min(1, 'Enter a reason').max(500) })
 
+export const adjustBalanceSchema = z.object({
+  direction: z.enum(['add', 'deduct'], { error: 'Choose add or deduct' }),
+  amount: z.coerce.number({ error: 'Enter an amount' }).positive('Enter an amount').max(10_000_000, 'Amount is too large'),
+  // Always required and shown to the user next to the adjustment
+  reason: z.string({ error: 'Enter a reason' }).trim().min(3, 'Enter a reason (at least 3 characters)').max(500),
+})
+
 export const changeReferrerSchema = z.object({
   // Empty = remove the referrer
   referralCode: z

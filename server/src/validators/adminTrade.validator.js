@@ -10,6 +10,17 @@ export const listAdminOrdersQuerySchema = z.object({
   limit: z.coerce.number().int().min(1).max(100).default(10),
 })
 
+/** An admin buys shares on behalf of a user whose payment never showed up in the system. */
+export const manualOrderSchema = z.object({
+  shareType: z.enum(SHARE_TYPES, { error: 'Choose a class' }),
+  amount: z.coerce.number({ error: 'Enter an amount' }).positive('Enter an amount').max(10_000_000, 'Amount is too large'),
+  paymentMethod: z.enum(PAYMENT_METHODS, { error: 'Choose how the user paid' }),
+  // tx hash, Zelle confirmation number or bank reference — optional but recommended
+  reference: z.string().trim().max(200).optional(),
+  note: z.string().trim().max(500).optional(),
+  payCommission: z.boolean({ error: 'Choose whether to pay the referral commission' }),
+})
+
 export const rejectOrderSchema = z.object({
   reason: z.string().trim().min(1, 'Enter a reason').max(500),
 })
@@ -27,6 +38,7 @@ const shareConfig = z.object({
 export const updateSettingsSchema = z.object({
   shares: z.object({ A: shareConfig, B: shareConfig }),
   minPurchase: z.object({ first: minAmount, next: minAmount }),
+  withdrawal: z.object({ mode: z.enum(['manual', 'auto']), minUsdt: minAmount }).optional(),
   payment: z.object({
     bep20: z.object({
       enabled: z.boolean(),

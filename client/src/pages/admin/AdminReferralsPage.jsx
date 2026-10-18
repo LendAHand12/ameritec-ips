@@ -468,12 +468,14 @@ export default function AdminReferralsPage() {
             </table>
           )}
           {tab === 'referrers' && (
-            <table className="w-full min-w-[900px] border-collapse">
+            <table className="w-full min-w-[1120px] border-collapse">
               <thead>
                 <tr>
                   <th className={`${th} pl-5`}>Referrer</th>
                   <th className={th}>KYC</th>
                   <th className={th}>Direct referrals (F1)</th>
+                  <th className={th}>Direct sales (F1)</th>
+                  <th className={th}>Team sales (all levels)</th>
                   <th className={th}>Available</th>
                   <th className={th}>Pending</th>
                   <th className={th}>Total earned</th>
@@ -497,6 +499,11 @@ export default function AdminReferralsPage() {
                       <td className={td}>
                         <p className="text-title font-semibold tabular-nums">{formatInt(r.referred)}</p>
                         <p className="text-caption text-muted-foreground">{formatInt(r.referredApproved)} KYC-approved</p>
+                      </td>
+                      <td className={`${td} text-title font-semibold tabular-nums`}>{formatUsdt(r.directSales)} USDT</td>
+                      <td className={`${td} text-title font-semibold tabular-nums`}>
+                        {formatUsdt(r.teamSales)} USDT
+                        <p className="text-caption font-normal text-muted-foreground">{formatInt(r.teamMembers)} in downline</p>
                       </td>
                       <td className={`${td} text-title tabular-nums`}>{formatUsdt(r.available)} USDT</td>
                       <td className={`${td} text-title tabular-nums ${r.pending > 0 ? 'text-warning' : 'text-muted-foreground'}`}>{formatUsdt(r.pending)} USDT</td>

@@ -1,4 +1,5 @@
 import mongoose from 'mongoose'
+import env from '../config/env.js'
 
 /** Single document (_id "global") holding everything an admin can configure. */
 const settingSchema = new mongoose.Schema(
@@ -30,6 +31,12 @@ const settingSchema = new mongoose.Schema(
     minPurchaseCents: {
       first: { type: Number, default: 0, min: 0 },
       next: { type: Number, default: 0, min: 0 },
+    },
+    // How withdrawals are paid out. 'manual': the request is created and an admin sends the USDT by hand.
+    // 'auto' (automatic payout) is planned but not available yet.
+    withdrawal: {
+      mode: { type: String, enum: ['manual', 'auto'], default: 'manual' },
+      minUsdt: { type: Number, min: 0, default: () => env.withdrawal.minUsdt },
     },
     payment: {
       bep20: {

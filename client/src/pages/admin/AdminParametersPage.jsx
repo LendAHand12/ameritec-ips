@@ -59,6 +59,7 @@ export default function AdminParametersPage() {
     setForm({
       shares: data.shares,
       minPurchase: data.minPurchase,
+      withdrawal: data.withdrawal,
       payment: { bep20: data.payment.bep20, zelle },
     })
     setMeta({ hasQr, updatedAt: data.updatedAt })
@@ -236,6 +237,41 @@ export default function AdminParametersPage() {
             />
           </Field>
         </div>
+      </Section>
+
+      <Section title="Withdrawals" description="How users get their commission balance out to their own wallet.">
+        <div role="radiogroup" aria-label="Withdrawal mode" className="grid gap-3 sm:grid-cols-2">
+          {[
+            ['manual', 'Manual', 'The user creates a request; an admin sends the USDT by hand and marks it paid.', false],
+            ['auto', 'Automatic', 'USDT is sent on-chain right after the request. Coming soon.', true],
+          ].map(([value, title, text, unavailable]) => (
+            <button
+              key={value}
+              type="button"
+              role="radio"
+              aria-checked={form.withdrawal.mode === value}
+              disabled={!canManage || unavailable}
+              onClick={() => set('withdrawal.mode', value)}
+              className={`rounded-lg border p-3.5 text-left transition-colors outline-none focus-visible:ring-3 focus-visible:ring-ring/30 disabled:cursor-not-allowed disabled:opacity-60 ${
+                form.withdrawal.mode === value ? 'border-primary bg-primary-soft' : 'bg-card hover:border-primary/50'
+              }`}
+            >
+              <span className="block text-sm font-semibold">{title}</span>
+              <span className="block pt-0.5 text-caption text-muted-foreground">{text}</span>
+            </button>
+          ))}
+        </div>
+        <Field label="Minimum withdrawal (USDT)" hint="Smallest amount a user can withdraw in one request." error={errors['withdrawal.minUsdt']}>
+          <Input
+            size="lg"
+            type="number"
+            step="0.01"
+            min="0"
+            value={form.withdrawal.minUsdt}
+            onChange={(e) => set('withdrawal.minUsdt', e.target.value)}
+            required
+          />
+        </Field>
       </Section>
 
       <div className="grid gap-[17.5px] lg:grid-cols-2">
