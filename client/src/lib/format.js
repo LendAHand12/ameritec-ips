@@ -6,6 +6,14 @@ const longDate = new Intl.DateTimeFormat('en-US', { month: 'short', day: '2-digi
 const mediumDate = new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
 const time = new Intl.DateTimeFormat('en-US', { hour: 'numeric', minute: '2-digit' })
 
+// Shares can be fractional (10 USDT at 4 USDT/share = 2.5): show up to 3 decimals, no trailing zeros
+const shareFmt = new Intl.NumberFormat('en-US', { maximumFractionDigits: 3 })
+export const formatShares = (n) => shareFmt.format(n ?? 0)
+
+/** Mirrors the server: shares for `amountCents` at `priceCents`, rounded at the 4th decimal digit (3 kept). */
+export const sharesFor = (amountCents, priceCents) => Math.round((amountCents * 1000) / priceCents) / 1000
+export const MIN_SHARES = 0.001
+
 export const formatUsdt = (n) => usdt.format(n)
 export const formatInt = (n) => integer.format(n)
 export const formatCompact = (n) => compact.format(n)

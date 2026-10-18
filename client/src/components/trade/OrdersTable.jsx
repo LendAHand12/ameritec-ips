@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { ShareSwatch } from '@/components/dashboard/ShareMarker'
 import StatusBadge from '@/components/dashboard/StatusBadge'
-import { formatDate, formatInt, formatUsdt } from '@/lib/format'
+import { formatDate, formatUsdt, formatShares } from '@/lib/format'
 import { ORDER_STATUS } from '@/lib/orders'
 import { certificateUrl } from '@/services/trade.service'
 
@@ -72,7 +72,7 @@ export default function OrdersTable({ orders, emptyText = 'No transactions yet.'
                 <td className={td}>
                   <span className="font-semibold text-foreground tabular-nums">{formatUsdt(o.amount)}</span> USDT
                 </td>
-                <td className={`${td} tabular-nums`}>{formatInt(o.shares)}</td>
+                <td className={`${td} tabular-nums`}>{formatShares(o.shares)}</td>
                 <td className={`${td} tabular-nums`}>{formatUsdt(o.price)} USDT</td>
                 <td className={td}>
                   <StatusBadge tone={status.tone} icon={o.status === 'completed'}>

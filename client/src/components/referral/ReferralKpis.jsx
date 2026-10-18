@@ -1,7 +1,7 @@
 import { ShoppingBagIcon, UsersIcon, WalletIcon } from 'lucide-react'
 import KpiCard, { KpiIcon } from '@/components/dashboard/KpiCard'
 import { ShareSwatch } from '@/components/dashboard/ShareMarker'
-import { formatClassRates, formatInt, formatUsdt } from '@/lib/format'
+import { formatClassRates, formatInt, formatUsdt, formatShares } from '@/lib/format'
 
 export default function ReferralKpis({ summary }) {
   const { network, commission, referralShares } = summary
@@ -31,7 +31,7 @@ export default function ReferralKpis({ summary }) {
       />
       <KpiCard
         label="Shares Bought by Your Referrals"
-        value={formatInt(referralShares.total)}
+        value={formatShares(referralShares.total)}
         unit="Shares"
         icon={<KpiIcon icon={ShoppingBagIcon} />}
         footer={
@@ -39,7 +39,7 @@ export default function ReferralKpis({ summary }) {
             {['A', 'B'].map((t) => (
               <span key={t} className="flex items-center gap-1.5">
                 <ShareSwatch type={t} className="size-[8.75px] rounded-[2.5px]" />
-                Class {t}: {formatInt(referralShares[t])}
+                Class {t}: {formatShares(referralShares[t])}
               </span>
             ))}
           </span>

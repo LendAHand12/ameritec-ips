@@ -10,7 +10,7 @@ import { Panel, PanelHeader } from '@/components/dashboard/Panel'
 import { ShareSwatch } from '@/components/dashboard/ShareMarker'
 import OrdersTable from '@/components/trade/OrdersTable'
 import { useAsync } from '@/hooks/useAsync'
-import { formatInt, formatUsdt } from '@/lib/format'
+import { formatInt, formatUsdt, formatShares, MIN_SHARES, sharesFor } from '@/lib/format'
 import { cn } from '@/lib/utils'
 import { walletConfigured } from '@/lib/wallet-config'
 import { createOrder, getTradeConfig, listOrders } from '@/services/trade.service'
@@ -70,22 +70,22 @@ export default function TradePage() {
   const share = config?.shares.find((s) => s.type === shareType)
   const amount = Number(amountInput) || 0
   const priceCents = share ? Math.round(share.price * 100) : 0
-  const shares = priceCents ? Math.floor(Math.round(amount * 100) / priceCents) : 0
-  const total = (shares * priceCents) / 100
-  const rounded = shares > 0 && Math.abs(total - amount) > 0.001
+  // You pay exactly what you enter and get amount ÷ price shares, fractions included (3 decimals, rounded at the 4th)
+  const amountCents = Math.round(amount * 100)
+  const shares = priceCents ? sharesFor(amountCents, priceCents) : 0
+  const total = amountCents / 100
+  const roundedShares = priceCents > 0 && shares > 0 && (amountCents * 1000) % priceCents !== 0
   const hasPaymentMethod = !!((config?.paymentMethods.bep20 && walletConfigured) || config?.paymentMethods.zelle)
   const minCents = Math.round((config?.minPurchase.amount ?? 0) * 100)
   const minLabel = config?.minPurchase.firstPurchase ? 'Minimum first purchase' : 'Minimum purchase'
-  // Whole shares only, so the smallest valid payment can sit slightly above the minimum
-  const minTotalCents = priceCents ? Math.max(1, Math.ceil(minCents / priceCents)) * priceCents : 0
-  const belowMin = shares >= 1 && Math.round(total * 100) < minCents
+  const belowMin = shares >= MIN_SHARES && amountCents < minCents
   const amountError =
     !amountInput || !share
       ? ''
-      : shares < 1
-        ? `Minimum is 1 share (${formatUsdt(share.price)} USDT)`
+      : shares < MIN_SHARES
+        ? 'Amount is too small to buy any shares'
         : belowMin
-          ? `${minLabel} is ${formatUsdt(minCents / 100)} USDT${minTotalCents !== minCents ? ` — at least ${formatUsdt(minTotalCents / 100)} USDT for whole ${share.label} shares` : ''}`
+          ? `${minLabel} is ${formatUsdt(minCents / 100)} USDT`
           : ''
 
   const methodOptions = [
@@ -100,10 +100,10 @@ export default function TradePage() {
     {
       value: 'zelle',
       label: 'Zelle',
-      description: 'Send a Zelle transfer, then tell us you’ve paid. Our team confirms it.',
+      description: 'Scan our Zelle QR code and put your transaction code in the transfer note. Our team confirms it.',
       icon: BanknoteIcon,
       available: !!config?.paymentMethods.zelle,
-      unavailable: 'Zelle is only available for US (+1) phone numbers.',
+      unavailable: config?.zelleUnavailable === 'us_only' ? 'Zelle is only available for accounts with a US (+1) phone number.' : 'Zelle isn’t available right now. Please contact support.',
     },
   ]
   const selectedMethod = methodOptions.find((m) => m.value === paymentMethod && m.available) ?? methodOptions.find((m) => m.available)
@@ -231,7 +231,7 @@ export default function TradePage() {
                 <div className="space-y-[6.25px] text-right">
                   <p className="text-caption text-muted-foreground">Estimated Shares</p>
                   <p>
-                    <span className="text-2xl font-bold text-primary tabular-nums">{formatInt(shares)}</span>{' '}
+                    <span className="text-2xl font-bold text-primary tabular-nums">{formatShares(shares)}</span>{' '}
                     <span className="text-caption font-bold text-muted-foreground">Shares</span>
                   </p>
                 </div>
@@ -239,7 +239,7 @@ export default function TradePage() {
               <p className="flex flex-wrap items-center justify-center gap-[5px] pt-[11.25px] text-caption text-muted-foreground">
                 <CalculatorIcon className="size-[18.75px]" aria-hidden />
                 {formatUsdt(amount)} USDT ÷ {formatUsdt(share.price)} USDT =
-                <span className="font-semibold text-foreground">{formatInt(shares)} Shares</span>
+                <span className="font-semibold text-foreground">{formatShares(shares)} Shares</span>
               </p>
 
               <div className="mt-[25px] rounded-lg border p-5">
@@ -251,7 +251,7 @@ export default function TradePage() {
                   <SummaryRow label="Investment Amount">{formatUsdt(amount)} USDT</SummaryRow>
                   <SummaryRow label="Class">{share.label}</SummaryRow>
                   <SummaryRow label="Price">{formatUsdt(share.price)} USDT / Share</SummaryRow>
-                  <SummaryRow label="Estimated Shares">{formatInt(shares)}</SummaryRow>
+                  <SummaryRow label="Estimated Shares">{formatShares(shares)}</SummaryRow>
                   <SummaryRow label="Transaction Fee">
                     <span className="text-success">0 USDT</span>
                   </SummaryRow>
@@ -259,15 +259,15 @@ export default function TradePage() {
                     {formatUsdt(total)} USDT
                   </SummaryRow>
                 </dl>
-                {rounded && (
+                {roundedShares && (
                   <p className="mt-2 rounded-md bg-muted px-3 py-2 text-caption text-muted-foreground">
-                    Shares are sold in whole units, so you’ll pay {formatUsdt(total)} USDT for {formatInt(shares)} shares.
+                    You pay exactly {formatUsdt(total)} USDT. Shares are counted to 3 decimal places (rounded from the 4th), so you get {formatShares(shares)} shares.
                   </p>
                 )}
               </div>
 
               <div className="pt-5">
-                <Button size="xl" className="w-full" disabled={shares < 1 || belowMin || !hasPaymentMethod} onClick={() => setConfirming(true)}>
+                <Button size="xl" className="w-full" disabled={shares < MIN_SHARES || belowMin || !hasPaymentMethod} onClick={() => setConfirming(true)}>
                   Review Purchase
                   <ArrowRightIcon />
                 </Button>
@@ -346,7 +346,7 @@ export default function TradePage() {
           {share && (
             <dl className="rounded-lg border px-4 py-1">
               <SummaryRow label="Class">{share.label}</SummaryRow>
-              <SummaryRow label="Shares">{formatInt(shares)}</SummaryRow>
+              <SummaryRow label="Shares">{formatShares(shares)}</SummaryRow>
               <SummaryRow label="Price">{formatUsdt(share.price)} USDT / Share</SummaryRow>
               <SummaryRow label="Total Payment" strong>
                 {formatUsdt(total)} USDT

@@ -12,7 +12,7 @@ import { ShareRing } from '@/components/dashboard/ShareMarker'
 import OrdersTable from '@/components/trade/OrdersTable'
 import { useAsync } from '@/hooks/useAsync'
 import { useAuth } from '@/hooks/useAuth'
-import { formatInt, formatPercent, formatUsdt } from '@/lib/format'
+import { formatPercent, formatUsdt, formatShares } from '@/lib/format'
 import { cn } from '@/lib/utils'
 import { getPortfolio } from '@/services/trade.service'
 
@@ -67,7 +67,7 @@ export default function DashboardPage() {
             />
             <KpiCard
               label="Total Shares"
-              value={formatInt(data.totalShares)}
+              value={formatShares(data.totalShares)}
               unit="Shares"
               icon={<KpiIcon icon={WalletIcon} />}
               footer={`Invested ${formatUsdt(data.totalInvested)} USDT`}
@@ -76,7 +76,7 @@ export default function DashboardPage() {
               <KpiCard
                 key={s.type}
                 label={s.label}
-                value={formatInt(s.quantity)}
+                value={formatShares(s.quantity)}
                 unit="Shares"
                 icon={<ShareRing type={s.type} />}
                 footer={`${formatUsdt(s.value)} USDT`}

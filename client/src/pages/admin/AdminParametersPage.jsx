@@ -257,14 +257,17 @@ export default function AdminParametersPage() {
           </Field>
         </Section>
 
-        <Section title="Zelle" description="Only offered to investors with a US (+1) phone number. Admins confirm Zelle payments manually.">
-          <Toggle disabled={!canManage} checked={form.payment.zelle.enabled} onChange={(v) => set('payment.zelle.enabled', v)} label="Accept Zelle payments" />
-          <Field label="Recipient (email or phone registered with Zelle)" error={errors['payment.zelle.recipient']}>
-            <Input size="lg" value={form.payment.zelle.recipient} onChange={(e) => set('payment.zelle.recipient', e.target.value)} />
-          </Field>
-          <Field label="Recipient name">
-            <Input size="lg" value={form.payment.zelle.recipientName} onChange={(e) => set('payment.zelle.recipientName', e.target.value)} />
-          </Field>
+        <Section
+          title="Zelle"
+          description="Only offered to investors with a US (+1) phone number. Customers pay by scanning your QR code and must put their transaction code in the transfer note; admins confirm each payment manually."
+        >
+          <Toggle
+            disabled={!canManage || !meta?.hasQr}
+            checked={form.payment.zelle.enabled && !!meta?.hasQr}
+            onChange={(v) => set('payment.zelle.enabled', v)}
+            label="Accept Zelle payments"
+          />
+          {!meta?.hasQr && <p className="text-caption text-warning">Upload the Zelle QR code below to turn Zelle on.</p>}
           <div className="space-y-1.5">
             <span className="text-caption font-semibold">Zelle QR code</span>
             <div className="flex items-center gap-4">
@@ -285,7 +288,7 @@ export default function AdminParametersPage() {
               </Button>
 )}
             </div>
-            <span className="block text-caption text-muted-foreground">Export the QR from your bank’s Zelle screen (PNG/JPG, max 2 MB).</span>
+            <span className="block text-caption text-muted-foreground">This QR code is all customers need — export it from your bank’s Zelle screen (PNG/JPG, max 2 MB).</span>
           </div>
         </Section>
       </div>

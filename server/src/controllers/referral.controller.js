@@ -9,6 +9,7 @@ import env from '../config/env.js'
 import Withdrawal from '../models/Withdrawal.js'
 import { getWalletSummary } from '../models/WalletTransaction.js'
 import { toCents } from '../utils/money.js'
+import { roundShares } from '../utils/shares.js'
 import { assertSensitiveAuth, requestWithdrawal } from '../services/withdrawal.service.js'
 
 const MAX_LEVELS = 3 // network is shown down to F3; commission is paid on F1 only
@@ -125,7 +126,7 @@ export async function getSummary(req, res) {
       count: commission.reduce((s, c) => s + c.count, 0),
       ratePct: { A: settings.commissionPct.A, B: settings.commissionPct.B },
     },
-    referralShares: { A: shares.A ?? 0, B: shares.B ?? 0, total: (shares.A ?? 0) + (shares.B ?? 0) },
+    referralShares: { A: roundShares(shares.A ?? 0), B: roundShares(shares.B ?? 0), total: roundShares((shares.A ?? 0) + (shares.B ?? 0)) },
   })
 }
 

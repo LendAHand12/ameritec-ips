@@ -9,7 +9,7 @@ import Pagination from '@/components/admin/Pagination'
 import { ShareSwatch } from '@/components/dashboard/ShareMarker'
 import StatusBadge from '@/components/dashboard/StatusBadge'
 import { useAsync } from '@/hooks/useAsync'
-import { formatDate, formatInt, formatUsdt } from '@/lib/format'
+import { formatDate, formatInt, formatUsdt, formatShares } from '@/lib/format'
 import { ORDER_STATUS, PAYMENT_METHOD_LABEL } from '@/lib/orders'
 import { cn } from '@/lib/utils'
 import { getOrderStats, listAdminOrders } from '@/services/admin.service'
@@ -189,7 +189,7 @@ export default function AdminTransactionsPage() {
                         <ShareSwatch type={o.shareType} />
                         Class {o.shareType}
                       </p>
-                      <p className="text-caption text-muted-foreground">{formatInt(o.shares)} shares</p>
+                      <p className="text-caption text-muted-foreground">{formatShares(o.shares)} shares</p>
                     </td>
                     <td className={`${td} text-title font-semibold tabular-nums`}>{formatUsdt(o.amount)}</td>
                     <td className={`${td} text-title text-muted-foreground`}>{o.paymentMethod ? PAYMENT_METHOD_LABEL[o.paymentMethod] : '—'}</td>

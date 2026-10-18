@@ -12,6 +12,7 @@ import {
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button, buttonVariants } from '@/components/ui/button'
+import { Checkbox } from '@/components/ui/checkbox'
 import { Input } from '@/components/ui/input'
 import { Spinner } from '@/components/ui/spinner'
 import CopyButton from '@/components/CopyButton'
@@ -20,7 +21,7 @@ import { Panel, PanelHeader } from '@/components/dashboard/Panel'
 import SegmentedControl from '@/components/dashboard/SegmentedControl'
 import { ShareSwatch } from '@/components/dashboard/ShareMarker'
 import StatusBadge from '@/components/dashboard/StatusBadge'
-import { formatDate, formatInt, formatUsdt } from '@/lib/format'
+import { formatDate, formatUsdt, formatShares } from '@/lib/format'
 import { ORDER_STATUS, PAYMENT_METHOD_LABEL, bscscanTxUrl } from '@/lib/orders'
 import { cn } from '@/lib/utils'
 import { walletConfigured } from '@/lib/wallet-config'
@@ -88,15 +89,17 @@ function UsdtPayment({ order, method, onStarted, onSubmitted }) {
   )
 }
 
-function ZellePayment({ order, method, onSubmitted }) {
+function ZellePayment({ order, onSubmitted }) {
   const [reference, setReference] = useState('')
+  const [confirmed, setConfirmed] = useState(false)
   const [submitting, setSubmitting] = useState(false)
 
   const submit = async (e) => {
     e.preventDefault()
+    if (!confirmed) return
     setSubmitting(true)
     try {
-      const { order: updated } = await trade.submitPayment(order.id, { method: 'zelle', reference: reference.trim() || undefined })
+      const { order: updated } = await trade.submitPayment(order.id, { method: 'zelle', memoConfirmed: true, reference: reference.trim() || undefined })
       onSubmitted(updated)
     } catch (err) {
       toast.error(err.message)
@@ -107,38 +110,47 @@ function ZellePayment({ order, method, onSubmitted }) {
 
   return (
     <div className="space-y-5">
-      <div className="flex flex-col gap-5 sm:flex-row">
-        {method.hasQr && (
-          <img src={trade.zelleQrUrl()} alt="Zelle QR code" className="size-[150px] shrink-0 self-center rounded-lg border object-contain p-1.5" />
-        )}
+      <div className="flex flex-col items-center gap-4 sm:flex-row sm:items-start">
+        <img src={trade.zelleQrUrl()} alt="Zelle QR code" className="size-[190px] shrink-0 rounded-xl border bg-white object-contain p-2" />
         <div className="min-w-0 flex-1 space-y-4">
-          <CopyField label="Send to (Zelle)" value={method.recipient} />
-          {method.recipientName && (
-            <p className="text-caption text-muted-foreground">
-              Recipient name <span className="font-bold text-foreground">{method.recipientName}</span>
-            </p>
-          )}
-          <CopyField label="Amount (USD)" value={formatUsdt(order.amount)} />
+          <p className="text-caption text-muted-foreground">Open your bank app, choose Zelle and scan this QR code to pay.</p>
+          <CopyField label="Amount to send (USD)" value={formatUsdt(order.amount)} />
         </div>
       </div>
 
-      <div className="rounded-lg border-2 border-dashed border-primary/40 bg-primary-soft/40 p-4">
-        <CopyField label="Memo / message — required" value={order.orderCode} />
-        <p className="mt-2 text-caption text-muted-foreground">
-          Paste this code into the Zelle memo so we can match your payment. Zelle QR codes only fill in the recipient, not the memo or amount.
-        </p>
+      {/* Mandatory: payments without the code in the note can't be matched or counted */}
+      <div className="rounded-xl border-2 border-primary bg-primary-soft/50 p-4">
+        <div className="flex items-start gap-3">
+          <AlertTriangleIcon className="mt-0.5 size-5 shrink-0 text-primary" />
+          <div className="min-w-0 flex-1 space-y-3">
+            <p className="text-title font-bold text-primary">Required: put this transaction code in the transfer note</p>
+            <CopyField label="Transaction code" value={order.orderCode} mono />
+            <p className="text-caption text-foreground">
+              Type <span className="font-bold">{order.orderCode}</span> in the Zelle <span className="font-bold">memo / note</span> field when you send the money.
+              <span className="font-bold text-primary"> A transfer without this code will NOT be counted</span> and the order can’t be approved. The QR code only fills in the recipient, not the note.
+            </p>
+          </div>
+        </div>
       </div>
 
-      <form onSubmit={submit} className="space-y-2.5">
-        <label htmlFor="reference" className="text-caption font-semibold">
-          Zelle confirmation number <span className="font-normal text-muted-foreground">(optional)</span>
+      <form onSubmit={submit} className="space-y-3">
+        <label className="flex cursor-pointer items-start gap-2.5 rounded-lg border p-3 text-caption">
+          <Checkbox className="mt-0.5" checked={confirmed} onCheckedChange={(v) => setConfirmed(v === true)} />
+          <span>
+            I sent <span className="font-bold">{formatUsdt(order.amount)} USD</span> by Zelle and wrote the code <span className="font-bold">{order.orderCode}</span> in the transfer note.
+          </span>
         </label>
-        <Input id="reference" size="lg" value={reference} onChange={(e) => setReference(e.target.value)} maxLength={100} autoComplete="off" />
-        <Button type="submit" size="xl" className="w-full" disabled={submitting}>
+        <div className="space-y-1.5">
+          <label htmlFor="reference" className="text-caption font-semibold">
+            Zelle confirmation number <span className="font-normal text-muted-foreground">(optional)</span>
+          </label>
+          <Input id="reference" size="lg" value={reference} onChange={(e) => setReference(e.target.value)} maxLength={100} autoComplete="off" />
+        </div>
+        <Button type="submit" size="xl" className="w-full" disabled={submitting || !confirmed}>
           {submitting && <Spinner className="size-5" />}
           I’ve paid
         </Button>
-        <p className="text-center text-caption text-subtle">Our team will confirm your Zelle payment, usually within 1 business day.</p>
+        <p className="text-center text-caption text-subtle">Our team checks the note and confirms your payment, usually within 1 business day.</p>
       </form>
     </div>
   )
@@ -318,7 +330,7 @@ export default function OrderPaymentPage() {
                 <UsdtPayment order={order} method={config.paymentMethods.bep20} onStarted={setOrder} onSubmitted={handleSubmitted} />
               )}
               {method === 'zelle' && config.paymentMethods.zelle && (
-                <ZellePayment order={order} method={config.paymentMethods.zelle} onSubmitted={handleSubmitted} />
+                <ZellePayment order={order} onSubmitted={handleSubmitted} />
               )}
             </div>
           )}
@@ -350,7 +362,7 @@ export default function OrderPaymentPage() {
                 Class {order.shareType}
               </span>
             </Row>
-            <Row label="Shares">{formatInt(order.shares)}</Row>
+            <Row label="Shares">{formatShares(order.shares)}</Row>
             <Row label="Price">{formatUsdt(order.price)} USDT / Share</Row>
             <Row label="Transaction fee">
               <span className="text-success">0 USDT</span>

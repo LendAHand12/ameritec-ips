@@ -19,7 +19,7 @@ const orderSchema = new mongoose.Schema(
     shareType: { type: String, enum: SHARE_TYPES, required: true },
     // Money is stored in USDT cents to avoid floating point errors
     priceCents: { type: Number, required: true },
-    shares: { type: Number, required: true, min: 1 },
+    shares: { type: Number, required: true, min: 0.001 }, // fractional (3 decimals), see utils/shares.js
     amountCents: { type: Number, required: true },
 
     status: { type: String, enum: Object.values(ORDER_STATUS), default: ORDER_STATUS.AWAITING_PAYMENT, index: true },

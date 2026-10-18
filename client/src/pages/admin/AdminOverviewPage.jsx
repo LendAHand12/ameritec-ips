@@ -17,7 +17,7 @@ import {
 import StatusBadge from '@/components/dashboard/StatusBadge'
 import { ShareSwatch } from '@/components/dashboard/ShareMarker'
 import { useAsync } from '@/hooks/useAsync'
-import { formatDate, formatDateTime24, formatDuration, formatInt, formatPercent, formatUsdt } from '@/lib/format'
+import { formatDate, formatDateTime24, formatDuration, formatInt, formatPercent, formatUsdt, formatShares } from '@/lib/format'
 import { KYC_STATUS } from '@/lib/adminUsers'
 import { useAdminAuth } from '@/hooks/useAdminAuth'
 import { ORDER_STATUS } from '@/lib/orders'
@@ -230,7 +230,7 @@ export default function AdminOverviewPage() {
       <div className="grid grid-cols-1 gap-[12.5px] sm:grid-cols-2 xl:grid-cols-4">
         <Kpi label="Total Users" value={users && formatInt(users.total)} unit="Users" note={overview && `+${formatInt(overview.users.newInPeriod)} ${range === 'today' ? 'today' : 'in this period'}`} icon={UsersIcon} />
         <Kpi label="USDT Transaction Volume" value={overview && formatUsdt(overview.volume.total)} unit="USDT" note={changePct != null ? `${formatPercent(changePct)} vs previous period` : 'No previous period to compare'} noteTone={changePct != null && changePct < 0 ? 'warning' : changePct != null ? 'success' : 'muted'} icon={BanknoteIcon} />
-        <Kpi label="Shares Sold" value={shares && formatInt(sold)} unit="Shares" note={shares && `${soldPct}% of current allocation`} noteTone="muted" icon={TrendingUpIcon} />
+        <Kpi label="Shares Sold" value={shares && formatShares(sold)} unit="Shares" note={shares && `${soldPct}% of current allocation`} noteTone="muted" icon={TrendingUpIcon} />
         <Kpi
           label="Support Requests Pending"
           value={support && formatInt(support.needsAttention)}
@@ -249,7 +249,7 @@ export default function AdminOverviewPage() {
         <MiniMetric label="KYC Approved" value={users && formatInt(users.approved)} icon={ShieldCheckIcon} />
         <MiniMetric label="Transactions Pending" value={orders && formatInt(orders.pendingReview)} icon={ArrowRightLeftIcon} />
         <MiniMetric label="Failed Transactions" value={overview && formatInt(failedOrders)} icon={XCircleIcon} />
-        <MiniMetric label="Remaining Share Allocation" value={shares && `${formatInt(remaining)} Shares`} icon={TrendingUpIcon} />
+        <MiniMetric label="Remaining Share Allocation" value={shares && `${formatShares(remaining)} Shares`} icon={TrendingUpIcon} />
       </div>
 
       {/* Charts */}
@@ -319,17 +319,17 @@ export default function AdminOverviewPage() {
             <p className="text-caption text-muted-foreground">Total Sold</p>
           </div>
           <div className="grid grid-cols-3 gap-2 text-caption">
-            <div><p className="flex items-center gap-1.5 text-muted-foreground"><ShareSwatch type="A" />Share A</p><p className="font-bold tabular-nums">{shares ? formatInt(shares.A) : '—'}</p></div>
-            <div><p className="flex items-center gap-1.5 text-muted-foreground"><ShareSwatch type="B" />Share B</p><p className="font-bold tabular-nums">{shares ? formatInt(shares.B) : '—'}</p></div>
-            <div><p className="flex items-center gap-1.5 text-muted-foreground"><i className="size-[12.5px] rounded-[3.75px] bg-steel/60" />Remaining</p><p className="font-bold tabular-nums">{shares ? formatInt(remaining) : '—'}</p></div>
+            <div><p className="flex items-center gap-1.5 text-muted-foreground"><ShareSwatch type="A" />Share A</p><p className="font-bold tabular-nums">{shares ? formatShares(shares.A) : '—'}</p></div>
+            <div><p className="flex items-center gap-1.5 text-muted-foreground"><ShareSwatch type="B" />Share B</p><p className="font-bold tabular-nums">{shares ? formatShares(shares.B) : '—'}</p></div>
+            <div><p className="flex items-center gap-1.5 text-muted-foreground"><i className="size-[12.5px] rounded-[3.75px] bg-steel/60" />Remaining</p><p className="font-bold tabular-nums">{shares ? formatShares(remaining) : '—'}</p></div>
           </div>
           <div className="mt-3 flex h-1.5 overflow-hidden rounded-full bg-muted">
             <span className="bg-share-a" style={{ width: `${shares?.total ? (shares.A / shares.total) * 100 : 0}%` }} />
             <span className="bg-share-b" style={{ width: `${shares?.total ? (shares.B / shares.total) * 100 : 0}%` }} />
           </div>
           <div className="flex justify-between pt-1.5 text-caption text-muted-foreground">
-            <span>{shares ? formatInt(sold) : '—'} sold</span>
-            <span>{shares ? formatInt(remaining) : '—'} remaining</span>
+            <span>{shares ? formatShares(sold) : '—'} sold</span>
+            <span>{shares ? formatShares(remaining) : '—'} remaining</span>
           </div>
         </section>
 
@@ -444,7 +444,7 @@ export default function AdminOverviewPage() {
                     <td className={`${td} text-caption font-semibold`}>{o.user?.fullName}</td>
                     <td className={`${td} text-caption`}><span className="flex items-center gap-2"><ShareSwatch type={o.shareType} />Share {o.shareType}</span></td>
                     <td className={`${td} text-caption font-semibold tabular-nums`}>{formatUsdt(o.amount)} USDT</td>
-                    <td className={`${td} text-caption tabular-nums text-muted-foreground`}>{formatInt(o.shares)}</td>
+                    <td className={`${td} text-caption tabular-nums text-muted-foreground`}>{formatShares(o.shares)}</td>
                     <td className={td}><StatusBadge tone={status?.tone} className="h-[26px]">{status?.label ?? o.status}</StatusBadge></td>
                   </tr>
                 )

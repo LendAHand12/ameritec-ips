@@ -7,7 +7,7 @@ import { Spinner } from '@/components/ui/spinner'
 import { Textarea } from '@/components/ui/textarea'
 import { useAdminAuth } from '@/hooks/useAdminAuth'
 import StatusBadge from '@/components/dashboard/StatusBadge'
-import { formatDate, formatInt, formatUsdt } from '@/lib/format'
+import { formatDate, formatUsdt, formatShares } from '@/lib/format'
 import { ORDER_STATUS, PAYMENT_METHOD_LABEL, bscscanTxUrl } from '@/lib/orders'
 import * as adminService from '@/services/admin.service'
 
@@ -98,7 +98,7 @@ export default function OrderReviewDialog({ orderId, onClose, onChanged }) {
               </dl>
               <dl>
                 <Row label="Class">Class {order.shareType}</Row>
-                <Row label="Shares">{formatInt(order.shares)}</Row>
+                <Row label="Shares">{formatShares(order.shares)}</Row>
                 <Row label="Price">{formatUsdt(order.price)} USDT</Row>
                 <Row label="Total">
                   <span className="font-bold">{formatUsdt(order.amount)} USDT</span>
@@ -142,6 +142,15 @@ export default function OrderReviewDialog({ orderId, onClose, onChanged }) {
                 {order.rejectionReason && <Row label="Rejection reason">{order.rejectionReason}</Row>}
               </dl>
             </section>
+
+            {order.paymentMethod === 'zelle' && order.status === 'pending_review' && (
+              <div className="rounded-lg border-2 border-primary/40 bg-primary-soft/40 p-3 text-sm">
+                <p className="font-bold text-primary">Check the Zelle transfer note</p>
+                <p className="pt-1 text-muted-foreground">
+                  Approve only if the transfer’s note contains <span className="font-mono font-bold text-foreground">{order.orderCode}</span> and the amount matches. A transfer without the code doesn’t count — reject it.
+                </p>
+              </div>
+            )}
 
             {order.status === 'completed' && (
               <section className="flex flex-wrap items-center gap-3 rounded-lg border p-3">

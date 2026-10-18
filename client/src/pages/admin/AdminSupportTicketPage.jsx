@@ -24,7 +24,7 @@ import { ACCEPTED_IMAGE_TYPES } from '@/components/auth/DocumentUpload'
 import { useAsync } from '@/hooks/useAsync'
 import { useObjectUrl } from '@/hooks/useObjectUrl'
 import { ACCOUNT_STATUS, KYC_STATUS } from '@/lib/adminUsers'
-import { formatDateTime24, formatInt, formatUsdt } from '@/lib/format'
+import { formatDateTime24, formatUsdt, formatShares } from '@/lib/format'
 import { ORDER_STATUS } from '@/lib/orders'
 import { ADMIN_TICKET_STATUS, CATEGORY_LABEL, DESCRIPTION_MAX, TICKET_PRIORITY, mergeImageFiles } from '@/lib/support'
 import { cn } from '@/lib/utils'
@@ -549,7 +549,7 @@ export default function AdminSupportTicketPage() {
                       ['Transaction ID', ticket.relatedOrder.orderCode],
                       ['Amount', `${formatUsdt(ticket.relatedOrder.amount)} USDT`],
                       ['Class', `Class ${ticket.relatedOrder.shareType}`],
-                      ['Shares', formatInt(ticket.relatedOrder.shares)],
+                      ['Shares', formatShares(ticket.relatedOrder.shares)],
                       [
                         'Status',
                         <StatusBadge key="s" tone={ORDER_STATUS[ticket.relatedOrder.status]?.tone}>

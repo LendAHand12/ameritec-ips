@@ -10,7 +10,7 @@ import { Panel, PanelHeader } from '@/components/dashboard/Panel'
 import { useAsync } from '@/hooks/useAsync'
 import { useDebounced } from '@/hooks/useDebounced'
 import { DATE_RANGES } from '@/lib/adminUsers'
-import { formatDate, formatInt, formatUsdt } from '@/lib/format'
+import { formatDate, formatInt, formatUsdt, formatShares } from '@/lib/format'
 import { cn } from '@/lib/utils'
 import { exportCommissions, listCommissions } from '@/services/referral.service'
 
@@ -122,7 +122,7 @@ export default function CommissionHistory() {
                   )}
                 </td>
                 <td className={td}>
-                  {formatInt(c.shares)} Class {c.shareType}
+                  {formatShares(c.shares)} Class {c.shareType}
                 </td>
                 <td className={`${td} w-[88px]`}>
                   <DropdownMenu>

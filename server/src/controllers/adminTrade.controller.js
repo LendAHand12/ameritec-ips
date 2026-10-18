@@ -5,6 +5,7 @@ import Order, { ORDER_STATUS } from '../models/Order.js'
 import { getSettings } from '../models/Setting.js'
 import ApiError from '../utils/ApiError.js'
 import { fromCents, toCents } from '../utils/money.js'
+import { roundShares } from '../utils/shares.js'
 import { completeOrder } from '../services/order.service.js'
 import { toOrderDto } from './trade.controller.js'
 import { describeAudit, diff, investorOf, summarizeChanges } from '../services/audit.service.js'
@@ -28,8 +29,6 @@ const settingsSnapshot = (s) => ({
   'USDT (BEP20) enabled': s.payment.bep20.enabled,
   'BEP20 wallet address': s.payment.bep20.address,
   'Zelle enabled': s.payment.zelle.enabled,
-  'Zelle recipient name': s.payment.zelle.recipientName,
-  'Zelle recipient': s.payment.zelle.recipient,
 })
 
 const escapeRegex = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
@@ -85,7 +84,7 @@ export async function getOrderStats(req, res) {
       completed: counts[ORDER_STATUS.COMPLETED] ?? 0,
       missingCertificates,
       revenue: fromCents(revenue[0]?.cents ?? 0),
-      sharesSold: revenue[0]?.shares ?? 0,
+      sharesSold: roundShares(revenue[0]?.shares ?? 0),
     },
   })
 }
@@ -157,8 +156,6 @@ const settingsDto = (s) => ({
     bep20: { enabled: s.payment.bep20.enabled, address: s.payment.bep20.address },
     zelle: {
       enabled: s.payment.zelle.enabled,
-      recipientName: s.payment.zelle.recipientName,
-      recipient: s.payment.zelle.recipient,
       hasQr: !!s.payment.zelle.qrImage,
     },
   },
@@ -174,11 +171,11 @@ export async function updateSettings(req, res) {
   if (payment.bep20.enabled && !payment.bep20.address) {
     throw new ApiError(400, 'Enter the receiving wallet address to enable USDT payments', { 'payment.bep20.address': 'Required when enabled' })
   }
-  if (payment.zelle.enabled && !payment.zelle.recipient) {
-    throw new ApiError(400, 'Enter the Zelle recipient to enable Zelle payments', { 'payment.zelle.recipient': 'Required when enabled' })
-  }
 
   const settings = await getSettings()
+  if (payment.zelle.enabled && !settings.payment.zelle.qrImage) {
+    throw new ApiError(400, 'Upload the Zelle QR code to enable Zelle payments', { 'payment.zelle.enabled': 'Upload the QR code first' })
+  }
   const before = settingsSnapshot(settings)
   for (const t of ['A', 'B']) {
     settings.shares[t].label = shares[t].label
@@ -192,8 +189,6 @@ export async function updateSettings(req, res) {
   settings.payment.bep20.enabled = payment.bep20.enabled
   settings.payment.bep20.address = payment.bep20.address
   settings.payment.zelle.enabled = payment.zelle.enabled
-  settings.payment.zelle.recipientName = payment.zelle.recipientName
-  settings.payment.zelle.recipient = payment.zelle.recipient
   await settings.save()
 
   const changes = diff(before, settingsSnapshot(settings))

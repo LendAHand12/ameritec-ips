@@ -35,10 +35,7 @@ export const updateSettingsSchema = z.object({
         .trim()
         .refine((v) => v === '' || /^0x[0-9a-fA-F]{40}$/.test(v), 'Enter a valid BEP20 wallet address (0x… 42 characters)'),
     }),
-    zelle: z.object({
-      enabled: z.boolean(),
-      recipientName: z.string().trim().max(100),
-      recipient: z.string().trim().max(100),
-    }),
+    // Zelle only needs the QR code (uploaded separately)
+    zelle: z.object({ enabled: z.boolean() }),
   }),
 })

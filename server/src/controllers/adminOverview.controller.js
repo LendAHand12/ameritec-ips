@@ -2,6 +2,7 @@ import Order, { ORDER_STATUS } from '../models/Order.js'
 import { getSettings } from '../models/Setting.js'
 import User from '../models/User.js'
 import { fromCents } from '../utils/money.js'
+import { roundShares } from '../utils/shares.js'
 
 const DAY = 24 * 60 * 60 * 1000
 const HOUR = 60 * 60 * 1000
@@ -91,9 +92,9 @@ export async function getOverview(req, res) {
   const volumeTotal = volume.reduce((sum, v) => sum + v.volume, 0)
   const volumePrevious = fromCents(prevVolume[0]?.cents ?? 0)
 
-  const soldBy = Object.fromEntries(['A', 'B'].map((t) => [t, sold.find((r) => r._id === t)?.shares ?? 0]))
+  const soldBy = Object.fromEntries(['A', 'B'].map((t) => [t, roundShares(sold.find((r) => r._id === t)?.shares ?? 0)]))
   const total = settings.allocation.A + settings.allocation.B
-  const soldTotal = soldBy.A + soldBy.B
+  const soldTotal = roundShares(soldBy.A + soldBy.B)
   const counts = Object.fromEntries(byStatus.map((r) => [r._id, r.n]))
 
   res.json({
@@ -111,7 +112,7 @@ export async function getOverview(req, res) {
         changePct: volumePrevious > 0 ? ((volumeTotal - volumePrevious) / volumePrevious) * 100 : null,
         series: volume,
       },
-      shares: { total, sold: soldTotal, remaining: Math.max(0, total - soldTotal), A: soldBy.A, B: soldBy.B },
+      shares: { total, sold: soldTotal, remaining: Math.max(0, roundShares(total - soldTotal)), A: soldBy.A, B: soldBy.B },
       orders: {
         completed: counts[ORDER_STATUS.COMPLETED] ?? 0,
         pending: counts[ORDER_STATUS.PENDING_REVIEW] ?? 0,

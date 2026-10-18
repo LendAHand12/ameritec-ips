@@ -18,7 +18,7 @@ import { useAdminAuth } from '@/hooks/useAdminAuth'
 import { useAsync } from '@/hooks/useAsync'
 import { useDebounced } from '@/hooks/useDebounced'
 import { KYC_STATUS } from '@/lib/adminUsers'
-import { formatDate, formatInt, formatPercent, formatShortDate, formatUsdt } from '@/lib/format'
+import { formatDate, formatInt, formatPercent, formatShortDate, formatUsdt, formatShares } from '@/lib/format'
 import { cn } from '@/lib/utils'
 import { bscscanTxUrl } from '@/lib/orders'
 import { getReferralSummary, listReferralCommissions, listReferrers, listWithdrawals, markWithdrawalPaid, rejectWithdrawal } from '@/services/admin.service'
@@ -450,7 +450,7 @@ export default function AdminReferralsPage() {
                           {formatUsdt(c.orderAmount)} USDT
                         </p>
                         <p className="text-caption text-muted-foreground">
-                          {formatInt(c.shares)} Class {c.shareType} shares
+                          {formatShares(c.shares)} Class {c.shareType} shares
                         </p>
                       </td>
                       <td className={`${td} text-title`}>{c.ratePct}%</td>

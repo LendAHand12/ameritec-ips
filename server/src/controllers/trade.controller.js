@@ -5,6 +5,7 @@ import { getSettings } from '../models/Setting.js'
 import { getBalanceCents, getPendingCents } from '../models/WalletTransaction.js'
 import ApiError from '../utils/ApiError.js'
 import { fromCents, toCents } from '../utils/money.js'
+import { MIN_SHARES, roundShares, sharesFor } from '../utils/shares.js'
 import { auditChainPayment, checkBep20Order, completeOrder, nextOrderCode } from '../services/order.service.js'
 import { notifyPaymentNeedsReview } from '../services/telegram.service.js'
 
@@ -72,10 +73,12 @@ export async function getTradeConfig(req, res) {
             }
           : null,
       zelle:
-        zelle.enabled && zelle.recipient && canUseZelle(req.user)
-          ? { recipientName: zelle.recipientName, recipient: zelle.recipient, hasQr: !!zelle.qrImage }
+        zelle.enabled && zelle.qrImage && canUseZelle(req.user)
+          ? { hasQr: true } // customers pay by scanning the admin's Zelle QR code
           : null,
     },
+    // Why Zelle isn't offered, so the screen can say so: the admin hasn't set it up, or this account isn't a US (+1) number
+    zelleUnavailable: !zelle.enabled || !zelle.qrImage ? 'not_configured' : !canUseZelle(req.user) ? 'us_only' : null,
     balance: fromCents(await getBalanceCents(req.user._id)),
     pendingBalance: fromCents(await getPendingCents(req.user._id)),
   })
@@ -93,10 +96,10 @@ export async function getPortfolio(req, res) {
 
   const holdings = Object.fromEntries(['A', 'B'].map((t) => [t, { shares: 0, investedCents: 0 }]))
   for (const o of completed) {
-    holdings[o.shareType].shares += o.shares
+    holdings[o.shareType].shares = roundShares(holdings[o.shareType].shares + o.shares)
     holdings[o.shareType].investedCents += o.amountCents
   }
-  const valueCents = (type) => holdings[type].shares * settings.shares[type].priceCents
+  const valueCents = (type) => Math.round(holdings[type].shares * settings.shares[type].priceCents)
 
   res.json({
     balance: fromCents(balanceCents),
@@ -107,7 +110,7 @@ export async function getPortfolio(req, res) {
       value: fromCents(valueCents(s.type)),
       invested: fromCents(holdings[s.type].investedCents),
     })),
-    totalShares: holdings.A.shares + holdings.B.shares,
+    totalShares: roundShares(holdings.A.shares + holdings.B.shares),
     totalValue: fromCents(valueCents('A') + valueCents('B')),
     totalInvested: fromCents(holdings.A.investedCents + holdings.B.investedCents),
     // Holdings over time (valued at the current price) for the performance chart
@@ -122,13 +125,14 @@ export async function createOrder(req, res) {
   const priceCents = settings.shares[shareType].priceCents
   if (!priceCents) throw new ApiError(400, 'This class is not available right now')
 
-  // Whole shares only; the user pays exactly shares × price
-  const shares = Math.floor(toCents(amount) / priceCents)
-  if (shares < 1) {
-    throw new ApiError(400, `Minimum purchase is 1 share (${fromCents(priceCents).toFixed(2)} USDT)`, { amount: 'Amount is below the price of one share' })
+  // The user pays exactly the amount they entered and gets amount ÷ price shares, fractions included
+  const amountCents = toCents(amount)
+  const shares = sharesFor(amountCents, priceCents)
+  if (shares < MIN_SHARES) {
+    throw new ApiError(400, 'That amount is too small to buy any shares', { amount: 'Amount is too small' })
   }
   const { firstPurchase, minCents } = await minPurchaseFor(req.user._id, settings)
-  if (shares * priceCents < minCents) {
+  if (amountCents < minCents) {
     const msg = `Minimum ${firstPurchase ? 'first purchase' : 'purchase'} is ${fromCents(minCents).toFixed(2)} USDT`
     throw new ApiError(400, msg, { amount: msg })
   }
@@ -139,7 +143,7 @@ export async function createOrder(req, res) {
     shareType,
     priceCents,
     shares,
-    amountCents: shares * priceCents,
+    amountCents,
   })
   res.status(201).json({ order: toOrderDto(order) })
 }
@@ -185,7 +189,7 @@ export async function submitPayment(req, res) {
     await Order.updateOne({ _id: order._id }, { chainCheck: { state: 'pending', checkedAt: new Date() } })
     auditChainPayment(order._id).catch((err) => console.error(`Chain audit failed for ${order.orderCode}:`, err.message))
   } else {
-    if (!settings.payment.zelle.enabled || !canUseZelle(req.user)) throw new ApiError(400, 'Zelle is not available for your account')
+    if (!settings.payment.zelle.enabled || !settings.payment.zelle.qrImage || !canUseZelle(req.user)) throw new ApiError(400, 'Zelle is not available for your account')
     order.paymentMethod = 'zelle'
     order.zelleReference = req.body.reference
     order.status = ORDER_STATUS.PENDING_REVIEW

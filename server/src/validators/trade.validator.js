@@ -17,6 +17,8 @@ export const submitPaymentSchema = z.discriminatedUnion('method', [
   }),
   z.object({
     method: z.literal('zelle'),
+    // The transfer only counts if its note contains the transaction code: the customer must confirm they wrote it
+    memoConfirmed: z.literal(true, { error: 'Confirm that you entered the transaction code in the transfer note' }),
     reference: z.string().trim().max(100).optional(),
   }),
 ])
