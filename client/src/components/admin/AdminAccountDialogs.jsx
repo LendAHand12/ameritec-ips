@@ -1,19 +1,14 @@
 import { useEffect, useState } from 'react'
-import { KeyRoundIcon, PlusIcon } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
+import FilterSelect from '@/components/admin/FilterSelect'
 import { Spinner } from '@/components/ui/spinner'
-import StatusBadge from '@/components/dashboard/StatusBadge'
-import { useAsync } from '@/hooks/useAsync'
-import { formatDateTime24 } from '@/lib/format'
 import * as adminService from '@/services/admin.service'
 
-const th = 'border-y border-divider bg-muted px-2.5 py-[11.25px] text-left text-caption font-semibold whitespace-nowrap text-muted-foreground'
-const td = 'border-b border-divider px-2.5 py-[11.25px]'
-const EMPTY = { fullName: '', email: '', password: '', permissions: [], isActive: true }
+const EMPTY = { fullName: '', email: '', password: '', permissions: [], roleId: '', isActive: true }
 
 function Field({ label, hint, error, children }) {
   return (
@@ -26,7 +21,7 @@ function Field({ label, hint, error, children }) {
 }
 
 /** One row per portal area with View / Manage checkboxes; Manage always includes View. */
-function PermissionMatrix({ modules, value, onChange }) {
+export function PermissionMatrix({ modules, value, onChange }) {
   const has = (p) => value.includes(p)
   const toggle = (module, level, on) => {
     const next = new Set(value)
@@ -75,14 +70,14 @@ function PermissionMatrix({ modules, value, onChange }) {
 }
 
 /** Create (admin = null) or edit a sub admin. */
-function AccountDialog({ open, admin, modules, onClose, onSaved }) {
+export function AccountDialog({ open, admin, modules, roles = [], onClose, onSaved }) {
   const [form, setForm] = useState(EMPTY)
   const [errors, setErrors] = useState({})
   const [saving, setSaving] = useState(false)
 
   useEffect(() => {
     if (!open) return
-    setForm(admin ? { ...EMPTY, ...admin, password: '' } : EMPTY)
+    setForm(admin ? { ...EMPTY, ...admin, roleId: admin.roleId ?? '', password: '' } : EMPTY)
     setErrors({})
   }, [open, admin])
 
@@ -96,8 +91,9 @@ function AccountDialog({ open, admin, modules, onClose, onSaved }) {
     setSaving(true)
     try {
       const { fullName, email, password, permissions, isActive } = form
-      if (admin) await adminService.updateAdminAccount(admin.id, { fullName, permissions, isActive })
-      else await adminService.createAdminAccount({ fullName, email, password, permissions })
+      const roleId = form.roleId || null
+      if (admin) await adminService.updateAdminAccount(admin.id, { fullName, permissions, roleId, isActive })
+      else await adminService.createAdminAccount({ fullName, email, password, permissions, roleId })
       toast.success(admin ? 'Sub admin updated' : 'Sub admin created')
       onSaved()
     } catch (err) {
@@ -129,8 +125,19 @@ function AccountDialog({ open, admin, modules, onClose, onSaved }) {
             </Field>
           )}
 
+          <Field label="Role" hint="Picking a role fills in its permissions. Changing them by hand makes this admin’s access custom." error={errors.roleId}>
+            <FilterSelect
+              label="Role"
+              allLabel="Custom access"
+              options={roles.map((r) => ({ value: r.id, label: r.name }))}
+              value={form.roleId}
+              onChange={(id) => setForm((f) => ({ ...f, roleId: id, permissions: id ? (roles.find((r) => r.id === id)?.permissions ?? f.permissions) : f.permissions }))}
+              className="h-10 w-full rounded-lg bg-card text-sm text-foreground"
+            />
+          </Field>
+
           <Field label="Permissions" error={errors.permissions}>
-            <PermissionMatrix modules={modules} value={form.permissions} onChange={(v) => set('permissions', v)} />
+            <PermissionMatrix modules={modules} value={form.permissions} onChange={(v) => setForm((f) => ({ ...f, roleId: '', permissions: v }))} />
           </Field>
 
           {admin && (
@@ -155,7 +162,7 @@ function AccountDialog({ open, admin, modules, onClose, onSaved }) {
   )
 }
 
-function PasswordDialog({ admin, onClose }) {
+export function PasswordDialog({ admin, onClose }) {
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [saving, setSaving] = useState(false)
@@ -205,112 +212,73 @@ function PasswordDialog({ admin, onClose }) {
   )
 }
 
-export default function AdminAccountsPage() {
-  const [reloadKey, setReloadKey] = useState(0)
-  const [editing, setEditing] = useState(undefined) // undefined = closed, null = new, object = edit
-  const [resetting, setResetting] = useState(null)
-  const { data: meta } = useAsync(() => adminService.getAdminAccountsMeta().then((r) => r.data), [])
-  const { data: admins } = useAsync(() => adminService.listAdminAccounts().then((r) => r.data), [reloadKey])
-  const modules = meta?.modules ?? []
+/** Create (role = null) or edit a role: a name and the permissions it carries. */
+export function RoleDialog({ open, role, modules, onClose, onSaved }) {
+  const [form, setForm] = useState({ name: '', description: '', permissions: [] })
+  const [errors, setErrors] = useState({})
+  const [saving, setSaving] = useState(false)
+
+  useEffect(() => {
+    if (!open) return
+    setForm(role ? { name: role.name, description: role.description ?? '', permissions: role.permissions } : { name: '', description: '', permissions: [] })
+    setErrors({})
+  }, [open, role])
+
+  const save = async (e) => {
+    e.preventDefault()
+    setSaving(true)
+    try {
+      if (role) await adminService.updateAdminRole(role.id, form)
+      else await adminService.createAdminRole(form)
+      toast.success(role ? 'Role updated' : 'Role created')
+      onSaved()
+    } catch (err) {
+      setErrors(err.details ?? {})
+      toast.error(err.message)
+    } finally {
+      setSaving(false)
+    }
+  }
 
   return (
-    <>
-      <div className="flex flex-wrap items-end justify-between gap-4">
-        <div>
-          <h1 className="text-[26px] leading-tight font-bold tracking-[-0.01em] sm:text-heading">Admins & Permissions</h1>
-          <p className="pt-[6.25px] text-title text-muted-foreground">Create sub admins and choose which areas of the portal each one can view or manage.</p>
-        </div>
-        <Button className="h-[50px] px-[21.25px] text-title font-bold" onClick={() => setEditing(null)} disabled={!meta}>
-          <PlusIcon />
-          New sub admin
-        </Button>
-      </div>
-
-      <section className="mt-[18.75px] overflow-hidden rounded-[11.25px] border bg-card shadow-[0_1.25px_1.25px_rgb(0_0_0/0.04)]">
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[860px] border-collapse">
-            <thead>
-              <tr>
-                <th className={`${th} pl-5`}>Admin</th>
-                <th className={th}>Role</th>
-                <th className={th}>Access</th>
-                <th className={th}>Status</th>
-                <th className={th}>Last sign-in</th>
-                <th className={th}>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {(admins ?? []).map((a) => {
-                const isSuper = a.role === 'super_admin'
-                const areas = modules.filter((m) => a.permissions.includes(`${m.key}:view`))
-                return (
-                  <tr key={a.id} className="hover:bg-muted/40">
-                    <td className={`${td} pl-5`}>
-                      <p className="text-title font-semibold">{a.fullName}</p>
-                      <p className="text-caption text-muted-foreground">{a.email}</p>
-                    </td>
-                    <td className={td}>
-                      <StatusBadge tone={isSuper ? 'brand' : 'neutral'} className="h-[26px]">
-                        {isSuper ? 'Super admin' : 'Sub admin'}
-                      </StatusBadge>
-                    </td>
-                    <td className={`${td} max-w-[320px] text-caption`}>
-                      {isSuper ? (
-                        <span className="text-muted-foreground">Full access</span>
-                      ) : areas.length ? (
-                        <span className="flex flex-wrap gap-1.5">
-                          {areas.map((m) => (
-                            <span key={m.key} className="rounded-md bg-muted px-2 py-0.5">
-                              {m.label}
-                              <span className="text-muted-foreground"> · {a.permissions.includes(`${m.key}:manage`) ? 'manage' : 'view'}</span>
-                            </span>
-                          ))}
-                        </span>
-                      ) : (
-                        <span className="text-subtle">No access</span>
-                      )}
-                    </td>
-                    <td className={td}>
-                      <StatusBadge tone={a.isActive ? 'success' : 'danger'} icon={false} className="h-[26px]">
-                        {a.isActive ? 'Active' : 'Inactive'}
-                      </StatusBadge>
-                    </td>
-                    <td className={`${td} text-caption text-muted-foreground whitespace-nowrap`}>{a.lastLoginAt ? formatDateTime24(a.lastLoginAt) : 'Never'}</td>
-                    <td className={`${td} whitespace-nowrap`}>
-                      {isSuper ? (
-                        <span className="text-caption text-subtle">—</span>
-                      ) : (
-                        <span className="flex gap-2">
-                          <Button variant="outline" className="h-[35px] rounded-lg px-[11.25px] text-title font-bold" onClick={() => setEditing(a)}>
-                            Edit
-                          </Button>
-                          <Button variant="outline" className="h-[35px] rounded-lg px-[11.25px] text-title font-bold" onClick={() => setResetting(a)}>
-                            <KeyRoundIcon />
-                            Password
-                          </Button>
-                        </span>
-                      )}
-                    </td>
-                  </tr>
-                )
-              })}
-            </tbody>
-          </table>
-          {!admins && <Spinner className="mx-auto my-16 size-6 text-muted-foreground" />}
-        </div>
-      </section>
-
-      <AccountDialog
-        open={editing !== undefined}
-        admin={editing ?? null}
-        modules={modules}
-        onClose={() => setEditing(undefined)}
-        onSaved={() => {
-          setEditing(undefined)
-          setReloadKey((k) => k + 1)
-        }}
-      />
-      <PasswordDialog admin={resetting} onClose={() => setResetting(null)} />
-    </>
+    <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="max-h-[90svh] overflow-y-auto sm:max-w-xl">
+        <form onSubmit={save} noValidate className="space-y-4">
+          <DialogHeader>
+            <DialogTitle className="text-subheading font-bold">{role ? `Edit role — ${role.name}` : 'New role'}</DialogTitle>
+            <DialogDescription>
+              {role?.adminCount ? `Changes apply immediately to the ${role.adminCount} admin(s) who have this role.` : 'Give this role to sub admins when you create or edit them.'}
+            </DialogDescription>
+          </DialogHeader>
+          <Field label="Role name" error={errors.name}>
+            <Input
+              value={form.name}
+              onChange={(e) => {
+                setForm((f) => ({ ...f, name: e.target.value }))
+                setErrors((x) => ({ ...x, name: undefined }))
+              }}
+              maxLength={50}
+              aria-invalid={!!errors.name}
+              placeholder="e.g. Finance"
+            />
+          </Field>
+          <Field label="Description" error={errors.description}>
+            <Input value={form.description} onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))} maxLength={200} placeholder="What this role is for" />
+          </Field>
+          <Field label="Permissions" error={errors.permissions}>
+            <PermissionMatrix modules={modules} value={form.permissions} onChange={(v) => setForm((f) => ({ ...f, permissions: v }))} />
+          </Field>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={onClose}>
+              Cancel
+            </Button>
+            <Button type="submit" disabled={saving}>
+              {saving && <Spinner />}
+              {role ? 'Save role' : 'Create role'}
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
   )
 }

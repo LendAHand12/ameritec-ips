@@ -26,10 +26,9 @@ import AdminGuestRoute from '@/components/routes/AdminGuestRoute'
 import AdminPermissionRoute from '@/components/routes/AdminPermissionRoute'
 import KycCallbackPage from '@/pages/user/KycCallbackPage'
 import AdminReferralsPage from '@/pages/admin/AdminReferralsPage'
-import AdminAccountsPage from '@/pages/admin/AdminAccountsPage'
+import AdminSettingsPage from '@/pages/admin/AdminSettingsPage'
 import AdminProtectedRoute from '@/components/routes/AdminProtectedRoute'
 import AdminLoginPage from '@/pages/admin/AdminLoginPage'
-import AdminPlaceholderPage from '@/pages/admin/AdminPlaceholderPage'
 import AdminOverviewPage from '@/pages/admin/AdminOverviewPage'
 import AdminUsersPage from '@/pages/admin/AdminUsersPage'
 import AdminTransactionsPage from '@/pages/admin/AdminTransactionsPage'
@@ -129,12 +128,11 @@ const router = createBrowserRouter([
                   },
                   {
                     element: <AdminPermissionRoute permission="admins:manage" />,
-                    children: [{ path: 'admins', element: <AdminAccountsPage />, handle: { title: 'Admins & Permissions' } }],
+                    children: [
+                      { path: 'settings', element: <AdminSettingsPage />, handle: { title: 'Settings' } },
+                      { path: 'admins', element: <Navigate to="/admin/settings" replace /> },
+                    ],
                   },
-                  ...[
-                    ['shares', 'Shares'],
-                    ['settings', 'Settings'],
-                  ].map(([path, title]) => ({ path, element: <AdminPlaceholderPage />, handle: { title } })),
                 ],
               },
             ],

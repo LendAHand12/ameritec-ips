@@ -286,8 +286,8 @@ export default function AdminUsersPage() {
                   <Checkbox checked={allVisibleSelected} onCheckedChange={toggleAll} aria-label="Select all visible users" disabled={!users.length} />
                 </th>
                 <th className={th}>Investor</th>
-                <th className={th}>Contact</th>
-                <th className={th}>Ref Code</th>
+                <th className={th}>Email / Ref Code</th>
+                <th className={th}>Referred By</th>
                 <th className={th}>Registered</th>
                 <th className={th}>KYC Status</th>
                 <th className={th}>Account Status</th>
@@ -306,11 +306,10 @@ export default function AdminUsersPage() {
                     <td className={`${td} text-title font-semibold`}>{u.fullName}</td>
                     <td className={td}>
                       <p className="text-title">{u.email}</p>
-                      <p className="text-caption text-muted-foreground">{u.phone}</p>
+                      <p className="text-caption text-muted-foreground">{u.referralCode}</p>
                     </td>
                     <td className={td}>
-                      <p className="text-title font-semibold">{u.referralCode}</p>
-                      {u.referredBy && <p className="text-caption text-muted-foreground">by {u.referredBy.referralCode}</p>}
+                      {u.referredBy ? <p className="text-title font-semibold">{u.referredBy.fullName}</p> : <span className="text-subtle">—</span>}
                     </td>
                     <td className={`${td} text-title text-muted-foreground`}>{formatDate(u.registeredAt)}</td>
                     <td className={td}>

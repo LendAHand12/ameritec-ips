@@ -3,28 +3,71 @@ import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { z } from 'zod'
-import { ArrowRightIcon, LockKeyholeIcon } from 'lucide-react'
+import { ArrowRightIcon, KeyRoundIcon, LockKeyholeIcon } from 'lucide-react'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
+import { FieldError } from '@/components/ui/field'
 import { Spinner } from '@/components/ui/spinner'
 import AuthCard from '@/components/auth/AuthCard'
 import EmailInput from '@/components/auth/EmailInput'
 import FormField from '@/components/auth/FormField'
+import OtpInput from '@/components/auth/OtpInput'
 import PasswordInput from '@/components/auth/PasswordInput'
 import { useAdminAuth } from '@/hooks/useAdminAuth'
 import { emailSchema } from '@/lib/schemas'
-import { adminLogin } from '@/services/admin.service'
+import { adminLogin, adminLoginTwoFactor } from '@/services/admin.service'
 
 const adminLoginSchema = z.object({
   email: emailSchema,
   password: z.string().min(1, 'Password is required'),
 })
 
+/** Second step for admins who turned two-factor on. */
+function TwoFactorStep({ loginToken, onSuccess, onBack }) {
+  const [code, setCode] = useState('')
+  const [error, setError] = useState('')
+  const [submitting, setSubmitting] = useState(false)
+
+  const submit = async (value = code) => {
+    if (value.length !== 6) return setError('Enter the 6-digit code')
+    setSubmitting(true)
+    setError('')
+    try {
+      const { admin } = await adminLoginTwoFactor(loginToken, value)
+      onSuccess(admin)
+    } catch (err) {
+      if (err.code === 'LOGIN_EXPIRED') return onBack(err.message)
+      setError(err.message)
+      setCode('')
+      setSubmitting(false)
+    }
+  }
+
+  return (
+    <AuthCard icon={KeyRoundIcon} title="Two-factor authentication" description="Enter the 6-digit code from your authenticator app.">
+      <div className="flex flex-col items-center gap-3">
+        <OtpInput value={code} onChange={(v) => { setCode(v); setError('') }} onComplete={submit} disabled={submitting} invalid={!!error} />
+        <FieldError>{error}</FieldError>
+      </div>
+      <div className="grid gap-[11.25px] pt-[25px] sm:grid-cols-[2fr_3fr]">
+        <Button size="xl" className="w-full sm:order-last" onClick={() => submit()} disabled={submitting || code.length !== 6}>
+          Verify
+          {submitting ? <Spinner className="size-5" /> : <ArrowRightIcon />}
+        </Button>
+        <Button variant="outline" size="xl" className="w-full bg-card" onClick={() => onBack()} disabled={submitting}>
+          Back
+        </Button>
+      </div>
+    </AuthCard>
+  )
+}
+
 export default function AdminLoginPage() {
   const navigate = useNavigate()
   const location = useLocation()
   const { setAdmin } = useAdminAuth()
   const [error, setError] = useState('')
+  const [loginToken, setLoginToken] = useState(null)
 
   const {
     register,
@@ -32,15 +75,35 @@ export default function AdminLoginPage() {
     formState: { errors, isSubmitting },
   } = useForm({ resolver: zodResolver(adminLoginSchema), defaultValues: { email: '', password: '' } })
 
+  const finish = (admin) => {
+    setAdmin(admin)
+    navigate(location.state?.from?.pathname ?? '/admin', { replace: true })
+  }
+
   const onSubmit = async (values) => {
     setError('')
     try {
-      const { admin } = await adminLogin(values)
-      setAdmin(admin)
-      navigate(location.state?.from?.pathname ?? '/admin', { replace: true })
+      const res = await adminLogin(values)
+      if (res.requiresTwoFactor) return setLoginToken(res.loginToken)
+      finish(res.admin)
     } catch (err) {
       setError(err.message)
     }
+  }
+
+  if (loginToken) {
+    return (
+      <div className="flex w-full max-w-[550px] flex-1 flex-col justify-center py-[37.5px]">
+        <TwoFactorStep
+          loginToken={loginToken}
+          onSuccess={finish}
+          onBack={(message) => {
+            setLoginToken(null)
+            if (message) setError(message)
+          }}
+        />
+      </div>
+    )
   }
 
   return (

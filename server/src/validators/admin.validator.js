@@ -101,6 +101,11 @@ export const rejectUserSchema = z.object({
   reason: z.string().trim().max(500).optional(),
 })
 
+export const adminLoginTwoFactorSchema = z.object({ loginToken: z.string().min(1), code: z.string().regex(/^\d{6}$/, 'Enter the 6-digit code') })
+export const adminSetupTwoFactorSchema = z.object({ password: z.string().min(1, 'Enter your password') })
+export const adminEnableTwoFactorSchema = z.object({ setupToken: z.string().min(1), code: z.string().regex(/^\d{6}$/, 'Enter the 6-digit code') })
+export const adminDisableTwoFactorSchema = z.object({ password: z.string().min(1, 'Enter your password'), code: z.string().regex(/^\d{6}$/, 'Enter the 6-digit code') })
+
 export const adminLoginSchema = z.object({
   email: emailSchema,
   password: z.string().min(1, 'Password is required'),

@@ -1,5 +1,6 @@
 import { PERMISSIONS, PERMISSION_LEVELS, PERMISSION_MODULES, ADMIN_ROLES, normalizePermissions } from '../config/permissions.js'
 import Admin from '../models/Admin.js'
+import AdminRole from '../models/AdminRole.js'
 import ApiError from '../utils/ApiError.js'
 import { describeAudit, diff, summarizeChanges } from '../services/audit.service.js'
 
@@ -11,10 +12,19 @@ const toDto = (a) => ({
   email: a.email,
   role: a.role,
   permissions: a.isSuperAdmin() ? PERMISSIONS : a.permissions,
+  roleId: a.roleRef ? String(a.roleRef) : null,
   isActive: a.isActive,
   lastLoginAt: a.lastLoginAt ?? null,
   createdAt: a.createdAt,
 })
+
+/** Access for a request: the chosen role's permissions, otherwise the list that was sent. */
+async function resolveAccess({ roleId, permissions }) {
+  if (!roleId) return { roleRef: null, permissions: normalizePermissions(permissions) }
+  const role = await AdminRole.findById(roleId)
+  if (!role) throw new ApiError(400, 'That role no longer exists', { roleId: 'Not found' })
+  return { roleRef: role._id, permissions: role.permissions }
+}
 
 const snapshot = (a) => ({
   Name: a.fullName,
@@ -40,7 +50,8 @@ export async function listAdmins(req, res) {
 }
 
 export async function createAdmin(req, res) {
-  const { fullName, email, password, permissions } = req.body
+  const { fullName, email, password } = req.body
+  const access = await resolveAccess(req.body)
   if (await Admin.exists({ email })) throw new ApiError(409, 'An admin with this email already exists', { email: 'Already in use' })
 
   const admin = await Admin.create({
@@ -48,7 +59,8 @@ export async function createAdmin(req, res) {
     email,
     password,
     role: ADMIN_ROLES.SUB,
-    permissions: normalizePermissions(permissions),
+    roleRef: access.roleRef,
+    permissions: access.permissions,
     createdBy: req.admin._id,
   })
   describeAudit(req, { record: adminRecord(admin), description: `Created sub admin with ${admin.permissions.length} permissions` })
@@ -60,7 +72,9 @@ export async function updateAdmin(req, res) {
   const before = snapshot(admin)
   admin.fullName = req.body.fullName
   admin.isActive = req.body.isActive
-  admin.permissions = normalizePermissions(req.body.permissions)
+  const access = await resolveAccess(req.body)
+  admin.roleRef = access.roleRef
+  admin.permissions = access.permissions
   await admin.save()
 
   const changes = diff(before, snapshot(admin))

@@ -5,7 +5,7 @@ import User, { ACCOUNT_STATUS, FACE_STATUS, USER_STATUS } from '../models/User.j
 import ApiError from '../utils/ApiError.js'
 import { ensureApplicationId } from '../utils/applicationId.js'
 import { toCsv } from '../utils/csv.js'
-import { maskEmail, maskPhone } from '../utils/mask.js'
+import { maskPhone } from '../utils/mask.js'
 import { sendAccountApprovedEmail, sendAccountRejectedEmail } from '../services/mail.service.js'
 import { describeAudit, investorOf } from '../services/audit.service.js'
 import { releasePendingCommissions } from '../services/commission.service.js'
@@ -53,12 +53,12 @@ function buildFilter({ q, kycStatus, emailStatus, faceStatus, accountStatus, reg
   return filter
 }
 
-/** Row shown in the admin table — contact details are masked. */
+/** Row shown in the admin table — the email is shown in full, the phone number is masked. */
 const toListItem = (u) => ({
   id: u.id,
   applicationId: u.applicationId,
   fullName: u.fullName,
-  email: maskEmail(u.email),
+  email: u.email,
   phone: maskPhone(u.phone),
   referralCode: u.referralCode,
   referredBy: u.referredBy ? { fullName: u.referredBy.fullName, referralCode: u.referredBy.referralCode } : null,

@@ -214,7 +214,25 @@ function StatusPanel({ order }) {
             Download certificate
           </a>
         )}
+        {order.status === 'completed' && order.hasCertificate && <CertificatePreview order={order} />}
       </div>
+    </div>
+  )
+}
+
+/** The share certificate shown in place: an image directly, a PDF in a frame. */
+function CertificatePreview({ order }) {
+  const src = `${trade.certificateUrl(order.id)}?inline=1`
+  const isPdf = order.certificateMime === 'application/pdf'
+  return (
+    <div className="mt-4 overflow-hidden rounded-lg border bg-muted">
+      {isPdf ? (
+        <iframe src={src} title="Share certificate" className="h-[560px] w-full bg-card" />
+      ) : (
+        <a href={src} target="_blank" rel="noreferrer">
+          <img src={src} alt={`Share certificate for order ${order.code ?? ''}`} className="mx-auto max-h-[560px] w-full object-contain" />
+        </a>
+      )}
     </div>
   )
 }

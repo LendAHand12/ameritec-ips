@@ -7,10 +7,13 @@ import { FieldError } from '@/components/ui/field'
 import { Spinner } from '@/components/ui/spinner'
 import OtpInput from '@/components/auth/OtpInput'
 import PasswordInput from '@/components/auth/PasswordInput'
-import { disableTwoFactor, enableTwoFactor, setupTwoFactor } from '@/services/account.service'
+import * as accountService from '@/services/account.service'
+
+// Customers and admins use the same dialogs against their own endpoints
+const ACCOUNT_API = { setup: accountService.setupTwoFactor, enable: accountService.enableTwoFactor, disable: accountService.disableTwoFactor }
 
 /** Turn two-factor on: confirm the password, scan the QR code, enter a code from the app. */
-export function EnableTwoFactorDialog({ open, onClose, onEnabled }) {
+export function EnableTwoFactorDialog({ open, onClose, onEnabled, api = ACCOUNT_API }) {
   const [step, setStep] = useState('password') // 'password' → 'scan'
   const [password, setPassword] = useState('')
   const [setup, setSetup] = useState(null)
@@ -23,7 +26,7 @@ export function EnableTwoFactorDialog({ open, onClose, onEnabled }) {
     if (!password) return setError('Enter your password')
     setBusy(true)
     try {
-      setSetup(await setupTwoFactor(password))
+      setSetup(await api.setup(password))
       setStep('scan')
       setError('')
     } catch (err) {
@@ -37,7 +40,7 @@ export function EnableTwoFactorDialog({ open, onClose, onEnabled }) {
     if (!/^\d{6}$/.test(value)) return setError('Enter the 6-digit code')
     setBusy(true)
     try {
-      await enableTwoFactor(setup.setupToken, value)
+      await api.enable(setup.setupToken, value)
       toast.success('Two-factor authentication is on')
       onEnabled()
     } catch (err) {
@@ -133,7 +136,7 @@ export function EnableTwoFactorDialog({ open, onClose, onEnabled }) {
 }
 
 /** Turning it off needs the password and a current code, so a stolen session can't weaken the account. */
-export function DisableTwoFactorDialog({ open, onClose, onDisabled }) {
+export function DisableTwoFactorDialog({ open, onClose, onDisabled, api = ACCOUNT_API }) {
   const [password, setPassword] = useState('')
   const [code, setCode] = useState('')
   const [errors, setErrors] = useState({})
@@ -148,7 +151,7 @@ export function DisableTwoFactorDialog({ open, onClose, onDisabled }) {
     if (Object.keys(next).length) return
     setBusy(true)
     try {
-      await disableTwoFactor(password, code)
+      await api.disable(password, code)
       toast.success('Two-factor authentication is off')
       onDisabled()
     } catch (err) {

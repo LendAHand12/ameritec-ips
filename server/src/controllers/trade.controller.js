@@ -26,6 +26,7 @@ export const toOrderDto = (o) => ({
   paymentError: o.paymentError ?? null,
   rejectionReason: o.rejectionReason ?? null,
   hasCertificate: !!o.certificate?.filename,
+  certificateMime: o.certificate?.filename ? (o.certificate.mimeType ?? null) : null,
   createdAt: o.createdAt,
   paidAt: o.paidAt ?? null,
   completedAt: o.completedAt ?? null,
@@ -237,7 +238,13 @@ export async function cancelOrder(req, res) {
 export async function downloadCertificate(req, res) {
   const order = await findMyOrder(req)
   if (!order.certificate?.filename) throw new ApiError(404, 'Certificate not available yet')
-  res.download(path.resolve(env.certificates.dir, path.basename(order.certificate.filename)), `${order.orderCode}-certificate${path.extname(order.certificate.filename)}`)
+  const file = path.resolve(env.certificates.dir, path.basename(order.certificate.filename))
+  // ?inline=1 lets the order page show the certificate in place instead of downloading it
+  if (req.query.inline) {
+    res.set('Cache-Control', 'private, max-age=300')
+    return res.sendFile(file)
+  }
+  res.download(file, `${order.orderCode}-certificate${path.extname(order.certificate.filename)}`)
 }
 
 export async function getZelleQr(req, res) {

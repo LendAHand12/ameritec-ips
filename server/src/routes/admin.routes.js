@@ -5,6 +5,7 @@ import * as adminAuth from '../controllers/adminAuth.controller.js'
 import * as adminReferrals from '../controllers/adminReferrals.controller.js'
 import * as adminOverview from '../controllers/adminOverview.controller.js'
 import * as adminAdmins from '../controllers/adminAdmins.controller.js'
+import * as adminRoles from '../controllers/adminRoles.controller.js'
 import * as adminTrade from '../controllers/adminTrade.controller.js'
 import * as adminSupport from '../controllers/adminSupport.controller.js'
 import * as auditLog from '../controllers/auditLog.controller.js'
@@ -12,7 +13,7 @@ import { auditAction as act, auditTrail } from '../services/audit.service.js'
 import { auditStatsQuerySchema, exportAuditLogsQuerySchema, listAuditLogsQuerySchema } from '../validators/auditLog.validator.js'
 import { protectAdmin, requirePermission, requireSuperAdmin } from '../middlewares/auth.js'
 import { validate } from '../middlewares/validate.js'
-import { authLimiter } from '../middlewares/rateLimit.js'
+import { authLimiter, otpLimiter } from '../middlewares/rateLimit.js'
 import { certificateUpload, settingsUpload, supportUpload } from '../middlewares/upload.js'
 import { MAX_TICKET_ATTACHMENTS } from '../models/SupportTicket.js'
 import {
@@ -23,10 +24,14 @@ import {
   listArticlesQuerySchema,
   updateTicketSchema,
 } from '../validators/support.validator.js'
-import { createAdminSchema, resetAdminPasswordSchema, updateAdminSchema } from '../validators/adminAccounts.validator.js'
+import { createAdminSchema, resetAdminPasswordSchema, roleSchema, updateAdminSchema } from '../validators/adminAccounts.validator.js'
 import { listAdminOrdersQuerySchema, manualOrderSchema, rejectOrderSchema, updateSettingsSchema } from '../validators/adminTrade.validator.js'
 import {
   adminLoginSchema,
+  adminLoginTwoFactorSchema,
+  adminSetupTwoFactorSchema,
+  adminEnableTwoFactorSchema,
+  adminDisableTwoFactorSchema,
   exportUsersQuerySchema,
   listUsersQuerySchema,
   adjustBalanceSchema,
@@ -51,14 +56,24 @@ router.use(auditTrail)
 
 // Admin authentication (separate from customer auth)
 router.post('/auth/login', act('admin.login'), authLimiter, validate(adminLoginSchema), adminAuth.login)
+router.post('/auth/login/2fa', act('admin.login'), otpLimiter, validate(adminLoginTwoFactorSchema), adminAuth.loginTwoFactor)
 router.post('/auth/logout', act('admin.logout'), adminAuth.logout)
 router.get('/auth/me', protectAdmin, adminAuth.me)
 
 // Everything below requires an admin session
 router.use(protectAdmin)
 
+// Two-factor for the signed-in admin's own account
+router.post('/me/2fa/setup', otpLimiter, validate(adminSetupTwoFactorSchema), adminAuth.setupTwoFactor)
+router.post('/me/2fa/enable', otpLimiter, act('admin.2fa_enable'), validate(adminEnableTwoFactorSchema), adminAuth.enableTwoFactor)
+router.post('/me/2fa/disable', otpLimiter, act('admin.2fa_disable'), validate(adminDisableTwoFactorSchema), adminAuth.disableTwoFactor)
+
 // Admin accounts & permissions (super admin only)
 router.get('/admins/meta', requireSuperAdmin, adminAdmins.getMeta)
+router.get('/admins/roles', requireSuperAdmin, adminRoles.listRoles)
+router.post('/admins/roles', requireSuperAdmin, act('admin.role_create'), validate(roleSchema), adminRoles.createRole)
+router.patch('/admins/roles/:id', requireSuperAdmin, act('admin.role_update'), validate(roleSchema), adminRoles.updateRole)
+router.delete('/admins/roles/:id', requireSuperAdmin, act('admin.role_delete'), adminRoles.deleteRole)
 router.get('/admins', requireSuperAdmin, adminAdmins.listAdmins)
 router.post('/admins', requireSuperAdmin, act('admin.create'), validate(createAdminSchema), adminAdmins.createAdmin)
 router.patch('/admins/:id', requireSuperAdmin, act('admin.update'), validate(updateAdminSchema), adminAdmins.updateAdmin)

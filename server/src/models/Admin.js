@@ -11,8 +11,16 @@ const adminSchema = new mongoose.Schema(
     // Accounts created before roles existed have no stored role and keep full access
     role: { type: String, enum: Object.values(ADMIN_ROLES), default: ADMIN_ROLES.SUPER },
     permissions: { type: [{ type: String, enum: PERMISSIONS }], default: [] }, // sub admins only
+    // The role these permissions came from (kept in step when the role changes); empty = set individually
+    roleRef: { type: mongoose.Schema.Types.ObjectId, ref: 'AdminRole', default: null },
     createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'Admin' },
     isActive: { type: Boolean, default: true },
+    twoFactor: {
+      enabled: { type: Boolean, default: false },
+      secret: { type: String, select: false },
+      // Last accepted TOTP time-step, prevents replaying the same code
+      lastUsedStep: { type: Number, select: false },
+    },
     lastLoginAt: Date,
   },
   {
@@ -20,6 +28,10 @@ const adminSchema = new mongoose.Schema(
     toJSON: {
       transform(doc, ret) {
         delete ret.password
+        if (ret.twoFactor) {
+          delete ret.twoFactor.secret
+          delete ret.twoFactor.lastUsedStep
+        }
         ret.permissions = doc.effectivePermissions()
         delete ret.__v
         return ret

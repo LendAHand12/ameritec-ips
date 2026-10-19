@@ -5,7 +5,6 @@ import {
   ArrowRightLeftIcon,
   BellIcon,
   BookOpenIcon,
-  KeyRoundIcon,
   ChevronDownIcon,
   LayoutGridIcon,
   LifeBuoyIcon,
@@ -14,7 +13,6 @@ import {
   SettingsIcon,
   ShieldCheckIcon,
   SlidersHorizontalIcon,
-  TrendingUpIcon,
   UsersIcon,
   XIcon,
 } from 'lucide-react'
@@ -37,13 +35,11 @@ const ADMIN_NAV = [
   { to: '/admin', label: 'Overview', icon: LayoutGridIcon, end: true, perm: 'overview:view' },
   { to: '/admin/users', label: 'Users & KYC', icon: UsersIcon, badge: 'facePending', perm: 'users:view' },
   { to: '/admin/transactions', label: 'Transactions', icon: ArrowRightLeftIcon, badge: 'ordersPending', perm: 'orders:view' },
-  { to: '/admin/shares', label: 'Shares', icon: TrendingUpIcon },
   { to: '/admin/referrals', label: 'Referral & Commission', icon: UsersIcon, perm: 'referrals:view' },
   { to: '/admin/parameters', label: 'Operational Parameters', icon: SlidersHorizontalIcon, perm: 'parameters:view' },
   { to: '/admin/support', label: 'Support', icon: LifeBuoyIcon, badge: 'supportPending', perm: 'support:view' },
   { to: '/admin/audit-logs', label: 'Audit Logs', icon: BookOpenIcon, perm: 'audit:view' },
-  { to: '/admin/admins', label: 'Admins & Permissions', icon: KeyRoundIcon, perm: 'admins:manage' },
-  { to: '/admin/settings', label: 'Settings', icon: SettingsIcon },
+  { to: '/admin/settings', label: 'Settings', icon: SettingsIcon, perm: 'admins:manage' },
 ]
 
 const ROLE_LABEL = { super_admin: 'Super admin', sub_admin: 'Sub admin' }
