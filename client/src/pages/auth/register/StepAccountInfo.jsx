@@ -141,6 +141,12 @@ export default function StepAccountInfo({ defaultValues, serverErrors, onNext })
         <FieldError errors={[errors.acceptTerms]} />
       </Field>
 
+      <p className="pt-3 text-caption text-muted-foreground">
+        Please also read the offering documents:{' '}
+        <a href="/legal/regulation-d" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">Regulation D (U.S. investors)</a> and{' '}
+        <a href="/legal/regulation-s" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">Regulation S (international investors)</a>.
+      </p>
+
       <StepActions nextType="submit" loading={isSubmitting} />
     </form>
   )

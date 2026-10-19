@@ -18,6 +18,7 @@ import GuidePage from '@/pages/user/GuidePage'
 import SupportPage from '@/pages/user/SupportPage'
 import AccountPage from '@/pages/user/AccountPage'
 import NotFoundPage from '@/pages/NotFoundPage'
+import LegalPage from '@/pages/LegalPage'
 import AdminAuthProvider from '@/context/AdminAuthProvider'
 import AdminAuthLayout from '@/layouts/AdminAuthLayout'
 import AdminLayout from '@/layouts/AdminLayout'
@@ -42,6 +43,8 @@ const router = createBrowserRouter([
     element: <RootLayout />,
     children: [
       { path: '/', element: <Navigate to="/dashboard" replace /> },
+      // Offering documents are public (linked from registration)
+      { path: 'legal/:doc', element: <LegalPage /> },
       {
         element: <GuestRoute />,
         children: [
