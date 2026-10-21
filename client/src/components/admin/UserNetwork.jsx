@@ -6,7 +6,7 @@ import SegmentedControl from '@/components/dashboard/SegmentedControl'
 import StatusBadge from '@/components/dashboard/StatusBadge'
 import { useAsync } from '@/hooks/useAsync'
 import { KYC_STATUS } from '@/lib/adminUsers'
-import { formatDate, formatInt, formatUsdt } from '@/lib/format'
+import { formatInt, formatUsdt, formatDateTime24 } from '@/lib/format'
 import { cn } from '@/lib/utils'
 import { getUserNetwork } from '@/services/admin.service'
 
@@ -98,7 +98,7 @@ function Body({ userId, onOpenUser }) {
                       {m.fullName}
                     </button>
                     <p className="text-muted-foreground">
-                      {m.referralCode} · joined {formatDate(m.joinedAt)}
+                      {m.referralCode} · joined {formatDateTime24(m.joinedAt)}
                       {m.level > 1 && byId[m.parentId] && <> · via {byId[m.parentId].fullName}</>}
                     </p>
                   </td>

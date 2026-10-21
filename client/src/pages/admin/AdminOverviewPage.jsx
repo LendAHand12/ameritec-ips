@@ -17,7 +17,7 @@ import {
 import StatusBadge from '@/components/dashboard/StatusBadge'
 import { ShareSwatch } from '@/components/dashboard/ShareMarker'
 import { useAsync } from '@/hooks/useAsync'
-import { formatDate, formatDateTime24, formatDuration, formatInt, formatPercent, formatUsdt, formatShares } from '@/lib/format'
+import { formatDateTime24, formatDuration, formatInt, formatPercent, formatUsdt, formatShares } from '@/lib/format'
 import { KYC_STATUS } from '@/lib/adminUsers'
 import { useAdminAuth } from '@/hooks/useAdminAuth'
 import { ORDER_STATUS } from '@/lib/orders'
@@ -439,7 +439,7 @@ export default function AdminOverviewPage() {
                 const status = ORDER_STATUS[o.status]
                 return (
                   <tr key={o.id} className="hover:bg-muted/40">
-                    <td className={`${td} pl-[18.75px] text-caption`}>{formatDate(o.createdAt)}</td>
+                    <td className={`${td} pl-[18.75px] text-caption`}>{formatDateTime24(o.createdAt)}</td>
                     <td className={`${td} text-caption font-bold`}>{o.orderCode}</td>
                     <td className={`${td} text-caption font-semibold`}>{o.user?.fullName}</td>
                     <td className={`${td} text-caption`}><span className="flex items-center gap-2"><ShareSwatch type={o.shareType} />Share {o.shareType}</span></td>

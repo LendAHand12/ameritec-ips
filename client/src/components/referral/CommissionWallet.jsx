@@ -25,7 +25,7 @@ import { Panel, PanelHeader } from '@/components/dashboard/Panel'
 import StatusBadge from '@/components/dashboard/StatusBadge'
 import { useAsync } from '@/hooks/useAsync'
 import { useAuth } from '@/hooks/useAuth'
-import { formatDate, formatUsdt } from '@/lib/format'
+import { formatUsdt, formatDateTime24 } from '@/lib/format'
 import { bscscanTxUrl } from '@/lib/orders'
 import { cn } from '@/lib/utils'
 import { createWithdrawal, getWallet, listCommissions, saveWallet } from '@/services/referral.service'
@@ -391,7 +391,7 @@ export default function CommissionWallet({ onChanged }) {
                 <div className="min-w-0 flex-1">
                   <p className="font-semibold">{a.amount >= 0 ? 'Added to your balance' : 'Deducted from your balance'}</p>
                   <p className="text-muted-foreground">
-                    {formatDate(a.date)} · {a.reason}
+                    {formatDateTime24(a.date)} · {a.reason}
                   </p>
                 </div>
                 <span className={cn('text-title font-bold tabular-nums', a.amount >= 0 ? 'text-success' : 'text-danger')}>
@@ -417,7 +417,7 @@ export default function CommissionWallet({ onChanged }) {
                   </span>
                   <div className="min-w-0 flex-1 text-caption">
                     <p className="font-semibold">
-                      {w.code} · {formatDate(w.createdAt)}
+                      {w.code} · {formatDateTime24(w.createdAt)}
                     </p>
                     <p className="truncate text-muted-foreground">
                       To {short(w.address)}

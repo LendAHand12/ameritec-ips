@@ -6,7 +6,7 @@ import { Checkbox } from '@/components/ui/checkbox'
 import { Input } from '@/components/ui/input'
 import { Spinner } from '@/components/ui/spinner'
 import { ShareSwatch } from '@/components/dashboard/ShareMarker'
-import { formatDate } from '@/lib/format'
+import { formatDateTime24 } from '@/lib/format'
 import { useAdminAuth } from '@/hooks/useAdminAuth'
 import * as adminService from '@/services/admin.service'
 
@@ -132,7 +132,7 @@ export default function AdminParametersPage() {
           <p className="pt-[6.25px] text-title text-muted-foreground">
             Class prices, share allocation, purchase minimums, referral commissions and payment methods.
             {!canManage && <span className="font-semibold"> View only.</span>}
-            {meta?.updatedAt && <span className="text-caption"> Last updated {formatDate(meta.updatedAt)}.</span>}
+            {meta?.updatedAt && <span className="text-caption"> Last updated {formatDateTime24(meta.updatedAt)}.</span>}
           </p>
         </div>
 {canManage && (

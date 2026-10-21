@@ -21,7 +21,7 @@ import { Panel, PanelHeader } from '@/components/dashboard/Panel'
 import SegmentedControl from '@/components/dashboard/SegmentedControl'
 import { ShareSwatch } from '@/components/dashboard/ShareMarker'
 import StatusBadge from '@/components/dashboard/StatusBadge'
-import { formatDate, formatUsdt, formatShares } from '@/lib/format'
+import { formatUsdt, formatShares, formatDateTime24 } from '@/lib/format'
 import { ORDER_STATUS, PAYMENT_METHOD_LABEL, bscscanTxUrl } from '@/lib/orders'
 import { cn } from '@/lib/utils'
 import { walletConfigured } from '@/lib/wallet-config'
@@ -324,7 +324,7 @@ export default function OrderPaymentPage() {
       <PageHeader
         breadcrumb={['Investor Portal', 'Trade', order.orderCode]}
         title={canPay ? 'Complete your payment' : 'Order details'}
-        description={`Order ${order.orderCode} · created ${formatDate(order.createdAt)}`}
+        description={`Order ${order.orderCode} · created ${formatDateTime24(order.createdAt)}`}
         action={<StatusBadge tone={status.tone} icon={order.status === 'completed'}>{status.label}</StatusBadge>}
       />
 
@@ -407,7 +407,7 @@ export default function OrderPaymentPage() {
               </Row>
             )}
             {order.zelleReference && <Row label="Zelle confirmation">{order.zelleReference}</Row>}
-            {order.completedAt && <Row label="Completed">{formatDate(order.completedAt)}</Row>}
+            {order.completedAt && <Row label="Completed">{formatDateTime24(order.completedAt)}</Row>}
           </dl>
           <Link to="/trade" className={buttonVariants({ variant: 'outline', className: 'mt-4 h-[50px] w-full gap-2 bg-card text-title font-bold' })}>
             <WalletIcon className="size-5" />

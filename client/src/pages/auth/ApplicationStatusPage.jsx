@@ -2,7 +2,7 @@ import { Link, useLocation } from 'react-router-dom'
 import { BellIcon, CheckIcon, ShieldCheckIcon, ShieldXIcon } from 'lucide-react'
 import { buttonVariants } from '@/components/ui/button'
 import StatusBadge from '@/components/dashboard/StatusBadge'
-import { formatDate } from '@/lib/format'
+import { formatDateTime24 } from '@/lib/format'
 import { cn } from '@/lib/utils'
 
 const VARIANTS = {
@@ -93,7 +93,7 @@ export default function ApplicationStatusPage() {
                 <dd className="font-bold">{state.applicationId}</dd>
               </div>
             )}
-            {state.submittedAt && <p className="text-subtle">Submitted {formatDate(state.submittedAt)}</p>}
+            {state.submittedAt && <p className="text-subtle">Submitted {formatDateTime24(state.submittedAt)}</p>}
             {state.reason && (
               <p className="pt-1 text-foreground">
                 <span className="font-semibold">Reason:</span> {state.reason}

@@ -11,7 +11,7 @@ import UserReviewDialog from '@/components/admin/UserReviewDialog'
 import StatusBadge from '@/components/dashboard/StatusBadge'
 import { useAsync } from '@/hooks/useAsync'
 import { ACCOUNT_STATUS, DATE_RANGES, KYC_STATUS } from '@/lib/adminUsers'
-import { formatDate, formatInt } from '@/lib/format'
+import { formatInt, formatDateTime24 } from '@/lib/format'
 import { cn } from '@/lib/utils'
 import { exportUsers, listUsers } from '@/services/admin.service'
 
@@ -311,7 +311,7 @@ export default function AdminUsersPage() {
                     <td className={td}>
                       {u.referredBy ? <p className="text-title font-semibold">{u.referredBy.fullName}</p> : <span className="text-subtle">—</span>}
                     </td>
-                    <td className={`${td} text-title text-muted-foreground`}>{formatDate(u.registeredAt)}</td>
+                    <td className={`${td} text-title text-muted-foreground`}>{formatDateTime24(u.registeredAt)}</td>
                     <td className={td}>
                       {u.faceStatus === 'pending' && (
                         <StatusBadge tone="warning" icon={false} className="mb-1.5 block w-fit">

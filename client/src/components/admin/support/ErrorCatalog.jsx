@@ -7,7 +7,7 @@ import { useAdminAuth } from '@/hooks/useAdminAuth'
 import StatusBadge from '@/components/dashboard/StatusBadge'
 import { useAsync } from '@/hooks/useAsync'
 import { useDebounced } from '@/hooks/useDebounced'
-import { formatDate, formatInt } from '@/lib/format'
+import { formatInt, formatDateTime24 } from '@/lib/format'
 import { CATEGORY_LABEL, SUPPORT_CATEGORIES } from '@/lib/support'
 import { cn } from '@/lib/utils'
 import { listSupportArticles } from '@/services/admin.service'
@@ -109,7 +109,7 @@ export default function ErrorCatalog() {
                       {a.published ? 'Published' : 'Hidden'}
                     </StatusBadge>
                   </td>
-                  <td className={`${td} whitespace-nowrap text-muted-foreground`}>{formatDate(a.updatedAt)}</td>
+                  <td className={`${td} whitespace-nowrap text-muted-foreground`}>{formatDateTime24(a.updatedAt)}</td>
                   <td className={td}>
 {canManage && (
                     <Button variant="outline" className="h-[35px] rounded-lg bg-card px-2.5 text-title font-bold" onClick={() => setEditing(a)}>

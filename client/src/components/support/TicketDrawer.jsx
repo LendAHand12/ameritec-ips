@@ -7,7 +7,7 @@ import { Spinner } from '@/components/ui/spinner'
 import { ACCEPTED_IMAGE_TYPES } from '@/components/auth/DocumentUpload'
 import { useAuth } from '@/hooks/useAuth'
 import { useObjectUrl } from '@/hooks/useObjectUrl'
-import { formatDate, formatDateTime } from '@/lib/format'
+import { formatDateTime, formatDateTime24 } from '@/lib/format'
 import { CATEGORY_LABEL, DESCRIPTION_MAX, mergeImageFiles } from '@/lib/support'
 import { cn } from '@/lib/utils'
 import { attachmentUrl, getTicket, replyToTicket } from '@/services/support.service'
@@ -175,7 +175,7 @@ export default function TicketDrawer({ ticketId, onClose, onUpdated }) {
             <>
               <div className="flex flex-wrap items-center gap-[8.75px] border-b border-divider py-[15px]">
                 <MetaItem>{CATEGORY_LABEL[ticket.category]}</MetaItem>
-                <MetaItem>Created {formatDate(ticket.createdAt)}</MetaItem>
+                <MetaItem>Created {formatDateTime24(ticket.createdAt)}</MetaItem>
                 <TicketStatusBadge status={ticket.status} />
                 {ticket.relatedTransaction && (
                   <span className="flex items-center gap-[5px] text-caption text-primary">

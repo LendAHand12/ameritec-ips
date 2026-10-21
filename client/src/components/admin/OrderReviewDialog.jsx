@@ -7,7 +7,7 @@ import { Spinner } from '@/components/ui/spinner'
 import { Textarea } from '@/components/ui/textarea'
 import { useAdminAuth } from '@/hooks/useAdminAuth'
 import StatusBadge from '@/components/dashboard/StatusBadge'
-import { formatDate, formatUsdt, formatShares } from '@/lib/format'
+import { formatUsdt, formatShares, formatDateTime24 } from '@/lib/format'
 import { ORDER_STATUS, PAYMENT_METHOD_LABEL, bscscanTxUrl } from '@/lib/orders'
 import * as adminService from '@/services/admin.service'
 
@@ -85,7 +85,7 @@ export default function OrderReviewDialog({ orderId, onClose, onChanged }) {
                 <StatusBadge tone={status.tone} icon={false}>
                   {status.label}
                 </StatusBadge>
-                <span>Created {formatDate(order.createdAt)}</span>
+                <span>Created {formatDateTime24(order.createdAt)}</span>
               </DialogDescription>
             </DialogHeader>
 
@@ -131,7 +131,7 @@ export default function OrderReviewDialog({ orderId, onClose, onChanged }) {
                     <Row label="Confirmation #">{order.zelleReference}</Row>
                   </>
                 )}
-                {order.paidAt && <Row label="Submitted">{formatDate(order.paidAt)}</Row>}
+                {order.paidAt && <Row label="Submitted">{formatDateTime24(order.paidAt)}</Row>}
                 {order.paymentError && <Row label="Verification">{order.paymentError}</Row>}
                 {order.chainCheck && order.chainCheck.state !== 'verified' && (
                   <Row label="On-chain check">
@@ -143,7 +143,7 @@ export default function OrderReviewDialog({ orderId, onClose, onChanged }) {
                 {order.chainCheck?.state === 'verified' && <Row label="On-chain check">Verified</Row>}
                 {order.completedAt && (
                   <Row label="Completed">
-                    {formatDate(order.completedAt)} · {order.completedBy === 'system' ? 'verified on-chain' : 'approved by admin'}
+                    {formatDateTime24(order.completedAt)} · {order.completedBy === 'system' ? 'verified on-chain' : 'approved by admin'}
                   </Row>
                 )}
                 {order.rejectionReason && <Row label="Rejection reason">{order.rejectionReason}</Row>}
@@ -164,7 +164,7 @@ export default function OrderReviewDialog({ orderId, onClose, onChanged }) {
                 <div className="min-w-0 flex-1">
                   <h3 className="text-sm font-semibold">Share certificate</h3>
                   <p className="truncate text-caption text-muted-foreground">
-                    {order.certificate ? `${order.certificate.originalName} · uploaded ${formatDate(order.certificate.uploadedAt)}` : 'Not uploaded yet'}
+                    {order.certificate ? `${order.certificate.originalName} · uploaded ${formatDateTime24(order.certificate.uploadedAt)}` : 'Not uploaded yet'}
                   </p>
                 </div>
                 {order.certificate && (

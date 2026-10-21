@@ -13,7 +13,7 @@ import StatusBadge from '@/components/dashboard/StatusBadge'
 import { useAsync } from '@/hooks/useAsync'
 import { useAuth } from '@/hooks/useAuth'
 import { DOCUMENT_TYPE_LABEL, KYC_STATUS } from '@/lib/adminUsers'
-import { formatDate, formatDateTime, formatDateTime24 } from '@/lib/format'
+import { formatDateTime, formatDateTime24 } from '@/lib/format'
 import { cn } from '@/lib/utils'
 import { faceImageUrl, getAccount, getSession, identityImageUrl, signOutOtherSessions, uploadIdentityPhoto } from '@/services/account.service'
 import { ACCEPTED_IMAGE_TYPES, MAX_IMAGE_SIZE_MB, validateImageFile } from '@/components/auth/DocumentUpload'
@@ -103,7 +103,7 @@ function ProfileTab({ account, onEdit }) {
           <Verified />
         </Cell>
         <Cell label="Referral Code">{profile.referralCode}</Cell>
-        <Cell label="Account Created">{formatDate(profile.createdAt)}</Cell>
+        <Cell label="Account Created">{formatDateTime24(profile.createdAt)}</Cell>
         <Cell label="Account Status" className="md:col-span-2 md:!border-r-0">
           <StatusBadge tone={status.tone} icon={false} className="min-w-[200px] justify-start">
             {status.label}
@@ -254,8 +254,8 @@ function IdentityTab({ account, onAddFace, startingFace, onChanged }) {
           </StatusBadge>
         </Cell>
         <Cell label="Document type">{DOCUMENT_TYPE_LABEL[identity.documentType] ?? '—'}</Cell>
-        <Cell label="Submitted">{formatDate(identity.submittedAt)}</Cell>
-        <Cell label="Reviewed">{identity.reviewedAt ? formatDate(identity.reviewedAt) : 'Not reviewed yet'}</Cell>
+        <Cell label="Submitted">{formatDateTime24(identity.submittedAt)}</Cell>
+        <Cell label="Reviewed">{identity.reviewedAt ? formatDateTime24(identity.reviewedAt) : 'Not reviewed yet'}</Cell>
       </dl>
 
       <IdentityPhotos photos={identity.photos} onChanged={onChanged} />
@@ -273,8 +273,8 @@ function IdentityTab({ account, onAddFace, startingFace, onChanged }) {
               </StatusBadge>
             </p>
             <p className="pt-1 text-caption text-muted-foreground">
-              {identity.face.status === 'approved' && `Verified${identity.face.reviewedAt ? ` on ${formatDate(identity.face.reviewedAt)}` : ''}.`}
-              {identity.face.status === 'pending' && `Submitted ${formatDate(identity.face.submittedAt)} — our team will review it shortly.`}
+              {identity.face.status === 'approved' && `Verified${identity.face.reviewedAt ? ` on ${formatDateTime24(identity.face.reviewedAt)}` : ''}.`}
+              {identity.face.status === 'pending' && `Submitted ${formatDateTime24(identity.face.submittedAt)} — our team will review it shortly.`}
               {identity.face.status === 'rejected' && `Not approved${identity.face.rejectionReason ? `: ${identity.face.rejectionReason}` : ''}. Please take a new photo.`}
               {identity.face.status === 'none' && 'Optional for buying shares, but needed to withdraw commission — and the commission your referrer earns from your purchases is held until it’s approved. You’ll be taken to our secure face scan page and brought back here.'}
             </p>
@@ -332,7 +332,7 @@ function SecurityTab({ account, onChangePassword, onToggleTwoFactor }) {
         <SecurityRow
           icon={KeyRoundIcon}
           title="Password"
-          text={security.passwordChangedAt ? `Last changed ${formatDate(security.passwordChangedAt)}` : 'Use a strong password you don’t use anywhere else.'}
+          text={security.passwordChangedAt ? `Last changed ${formatDateTime24(security.passwordChangedAt)}` : 'Use a strong password you don’t use anywhere else.'}
           action={
             <Button variant="outline" className="bg-card font-semibold" onClick={onChangePassword}>
               Change password
@@ -415,7 +415,7 @@ function SessionsTab() {
               </p>
               <p className="text-caption text-muted-foreground">
                 IP {data.current.ip ?? '—'} · Signed in {data.current.signedInAt ? formatDateTime24(data.current.signedInAt) : '—'}
-                {data.current.expiresAt && ` · Expires ${formatDate(data.current.expiresAt)}`}
+                {data.current.expiresAt && ` · Expires ${formatDateTime24(data.current.expiresAt)}`}
               </p>
             </div>
             <MonitorIcon className="hidden size-5 text-subtle sm:block" aria-hidden />

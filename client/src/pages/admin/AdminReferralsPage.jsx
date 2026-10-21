@@ -18,7 +18,7 @@ import { useAdminAuth } from '@/hooks/useAdminAuth'
 import { useAsync } from '@/hooks/useAsync'
 import { useDebounced } from '@/hooks/useDebounced'
 import { KYC_STATUS } from '@/lib/adminUsers'
-import { formatDate, formatInt, formatPercent, formatShortDate, formatUsdt, formatShares } from '@/lib/format'
+import { formatInt, formatPercent, formatShortDate, formatUsdt, formatShares, formatDateTime24 } from '@/lib/format'
 import { cn } from '@/lib/utils'
 import { bscscanTxUrl } from '@/lib/orders'
 import { getReferralSummary, listReferralCommissions, listReferrers, listWithdrawals, markWithdrawalPaid, rejectWithdrawal } from '@/services/admin.service'
@@ -436,7 +436,7 @@ export default function AdminReferralsPage() {
                   const s = COMMISSION_STATUS[c.status]
                   return (
                     <tr key={c.id} className="transition-colors hover:bg-muted/40">
-                      <td className={`${td} pl-5 text-title text-muted-foreground`}>{formatDate(c.date)}</td>
+                      <td className={`${td} pl-5 text-title text-muted-foreground`}>{formatDateTime24(c.date)}</td>
                       <td className={td}>
                         <PersonCell person={c.earner} onOpen={setReviewId} canOpen={canOpenUser} />
                       </td>
@@ -459,7 +459,7 @@ export default function AdminReferralsPage() {
                         <StatusBadge tone={s.tone} icon={false}>
                           {s.label}
                         </StatusBadge>
-                        {c.status === 'available' && c.releasedAt && <p className="pt-1 text-caption text-muted-foreground">Released {formatDate(c.releasedAt)}</p>}
+                        {c.status === 'available' && c.releasedAt && <p className="pt-1 text-caption text-muted-foreground">Released {formatDateTime24(c.releasedAt)}</p>}
                       </td>
                     </tr>
                   )
@@ -542,7 +542,7 @@ export default function AdminReferralsPage() {
                     <tr key={w.id} className="transition-colors hover:bg-muted/40">
                       <td className={`${td} pl-5`}>
                         <p className="text-title font-semibold">{w.code}</p>
-                        <p className="text-caption text-muted-foreground">{formatDate(w.date)}</p>
+                        <p className="text-caption text-muted-foreground">{formatDateTime24(w.date)}</p>
                       </td>
                       <td className={td}>
                         <PersonCell person={w.user} onOpen={setReviewId} canOpen={canOpenUser} />
@@ -583,7 +583,7 @@ export default function AdminReferralsPage() {
                             </Button>
                           </span>
                         ) : (
-                          <span className="text-subtle">{w.processedAt ? formatDate(w.processedAt) : '—'}</span>
+                          <span className="text-subtle">{w.processedAt ? formatDateTime24(w.processedAt) : '—'}</span>
                         )}
                       </td>
                     </tr>

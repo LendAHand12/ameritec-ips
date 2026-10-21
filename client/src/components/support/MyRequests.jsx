@@ -9,7 +9,7 @@ import { Panel, PanelHeader } from '@/components/dashboard/Panel'
 import { useAsync } from '@/hooks/useAsync'
 import { useDebounced } from '@/hooks/useDebounced'
 import { DATE_RANGES } from '@/lib/adminUsers'
-import { formatDate, formatInt } from '@/lib/format'
+import { formatInt, formatDateTime24 } from '@/lib/format'
 import { CATEGORY_LABEL, SUPPORT_CATEGORIES, TICKET_STATUS } from '@/lib/support'
 import { cn } from '@/lib/utils'
 import { getTicketStats, listTickets } from '@/services/support.service'
@@ -128,8 +128,8 @@ export default function MyRequests() {
                   <td className={`${td} pl-[25px] font-semibold text-foreground`}>{t.ticketCode}</td>
                   <td className={`${td} max-w-[360px] truncate font-semibold text-foreground`}>{t.subject}</td>
                   <td className={td}>{CATEGORY_LABEL[t.category]}</td>
-                  <td className={td}>{formatDate(t.createdAt)}</td>
-                  <td className={td}>{formatDate(t.lastActivityAt)}</td>
+                  <td className={td}>{formatDateTime24(t.createdAt)}</td>
+                  <td className={td}>{formatDateTime24(t.lastActivityAt)}</td>
                   <td className={td}>
                     <TicketStatusBadge status={t.status} />
                   </td>

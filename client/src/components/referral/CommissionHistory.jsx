@@ -10,7 +10,7 @@ import { Panel, PanelHeader } from '@/components/dashboard/Panel'
 import { useAsync } from '@/hooks/useAsync'
 import { useDebounced } from '@/hooks/useDebounced'
 import { DATE_RANGES } from '@/lib/adminUsers'
-import { formatDate, formatInt, formatUsdt, formatShares } from '@/lib/format'
+import { formatInt, formatUsdt, formatShares, formatDateTime24 } from '@/lib/format'
 import { cn } from '@/lib/utils'
 import { exportCommissions, listCommissions } from '@/services/referral.service'
 
@@ -104,7 +104,7 @@ export default function CommissionHistory() {
           <tbody>
             {rows.map((c) => (
               <tr key={c.id} className="transition-colors hover:bg-muted/40">
-                <td className={`${td} pl-[25px]`}>{formatDate(c.date)}</td>
+                <td className={`${td} pl-[25px]`}>{formatDateTime24(c.date)}</td>
                 <td className={`${td} font-semibold text-foreground`}>{c.member}</td>
                 <td className={`${td} font-semibold text-foreground`}>{c.orderCode}</td>
                 <td className={td}>

@@ -12,7 +12,8 @@ import ManualPurchaseDialog from '@/components/admin/ManualPurchaseDialog'
 import UserNetwork from '@/components/admin/UserNetwork'
 import StatusBadge from '@/components/dashboard/StatusBadge'
 import { ACCOUNT_STATUS, DOCUMENT_TYPE_LABEL, KYC_STATUS } from '@/lib/adminUsers'
-import { formatDate, formatDateTime, formatShares, formatUsdt } from '@/lib/format'
+import { formatDateTime, formatShares, formatUsdt, formatDateTime24 } from '@/lib/format'
+import { FACE_REJECTION_TEMPLATES, KYC_REJECTION_TEMPLATES } from '@/lib/rejectionTemplates'
 import * as adminService from '@/services/admin.service'
 
 function Row({ label, children }) {
@@ -187,11 +188,11 @@ export default function UserReviewDialog({ userId, onClose, onChanged }) {
                 </Row>
               </dl>
               <dl>
-                <Row label="Registered">{formatDate(user.createdAt)}</Row>
-                <Row label="KYC submitted">{user.emailVerifiedAt && formatDate(user.emailVerifiedAt)}</Row>
+                <Row label="Registered">{formatDateTime24(user.createdAt)}</Row>
+                <Row label="KYC submitted">{user.emailVerifiedAt && formatDateTime24(user.emailVerifiedAt)}</Row>
                 <Row label="Two-factor">{user.twoFactor?.enabled ? 'Enabled' : 'Disabled'}</Row>
                 <Row label="Reviewed">
-                  {user.reviewedAt && `${formatDate(user.reviewedAt)}${user.reviewedBy ? ` by ${user.reviewedBy.fullName}` : ''}`}
+                  {user.reviewedAt && `${formatDateTime24(user.reviewedAt)}${user.reviewedBy ? ` by ${user.reviewedBy.fullName}` : ''}`}
                 </Row>
               </dl>
             </div>
@@ -274,7 +275,7 @@ export default function UserReviewDialog({ userId, onClose, onChanged }) {
                       {user.wallet.adjustments.map((a) => (
                         <li key={a.id} className="flex flex-wrap items-baseline justify-between gap-x-3 text-caption">
                           <span className="min-w-0 flex-1 text-muted-foreground">
-                            {formatDate(a.date)} · {a.reason}
+                            {formatDateTime24(a.date)} · {a.reason}
                             {a.by && <span> — {a.by}</span>}
                           </span>
                           <span className={`font-bold tabular-nums ${a.amount >= 0 ? 'text-success' : 'text-danger'}`}>
@@ -327,7 +328,7 @@ export default function UserReviewDialog({ userId, onClose, onChanged }) {
 
             {deleted && (
               <div className="rounded-lg bg-danger-soft p-3 text-sm text-danger">
-                <p className="font-semibold">This user was deleted on {formatDate(user.deletedAt)}.</p>
+                <p className="font-semibold">This user was deleted on {formatDateTime24(user.deletedAt)}.</p>
                 {user.deletedSnapshot?.email && (
                   <p>
                     Former email {user.deletedSnapshot.email} and phone {user.deletedSnapshot.phone} can be used for a new account.
@@ -407,7 +408,7 @@ export default function UserReviewDialog({ userId, onClose, onChanged }) {
                           <span className="font-semibold">{Math.round(user.ageEstimate)}</span>
                         </p>
                       )}
-                      {user.face.status === 'approved' && <p className="text-muted-foreground">Approved{user.face.reviewedAt ? ` on ${formatDate(user.face.reviewedAt)}` : ''}.</p>}
+                      {user.face.status === 'approved' && <p className="text-muted-foreground">Approved{user.face.reviewedAt ? ` on ${formatDateTime24(user.face.reviewedAt)}` : ''}.</p>}
                       {user.face.status === 'rejected' && (
                         <p className="text-muted-foreground">Rejected{user.face.rejectionReason ? `: ${user.face.rejectionReason}` : ''}. The user can scan again.</p>
                       )}
@@ -433,7 +434,23 @@ export default function UserReviewDialog({ userId, onClose, onChanged }) {
                 <label htmlFor="action-reason" className="text-sm font-semibold">
                   {mode === 'reject' || mode === 'faceReject' ? 'Rejection reason (shown to the user)' : mode === 'delete' ? 'Deletion reason (internal, optional)' : 'Lock reason (internal, optional)'}
                 </label>
-                <Textarea id="action-reason" value={reason} onChange={(e) => setReason(e.target.value)} maxLength={500} autoFocus />
+                {(mode === 'reject' || mode === 'faceReject') && (
+                  <div className="flex flex-wrap gap-1.5" aria-label="Quick reasons">
+                    {(mode === 'reject' ? KYC_REJECTION_TEMPLATES : FACE_REJECTION_TEMPLATES).map((t) => (
+                      <button
+                        key={t.label}
+                        type="button"
+                        title={t.text}
+                        onClick={() => setReason((r) => (r.trim() ? (r.includes(t.text) ? r : `${r.trim()}
+${t.text}`) : t.text).slice(0, 500))}
+                        className="rounded-full border bg-card px-2.5 py-1 text-caption font-semibold text-muted-foreground transition-colors hover:border-primary/50 hover:text-foreground"
+                      >
+                        {t.label}
+                      </button>
+                    ))}
+                  </div>
+                )}
+                <Textarea id="action-reason" value={reason} onChange={(e) => setReason(e.target.value)} maxLength={500} rows={4} autoFocus />
               </div>
             )}
 

@@ -5,7 +5,7 @@ import Pagination from '@/components/admin/Pagination'
 import { Panel, PanelHeader } from '@/components/dashboard/Panel'
 import SegmentedControl from '@/components/dashboard/SegmentedControl'
 import StatusBadge from '@/components/dashboard/StatusBadge'
-import { formatDate } from '@/lib/format'
+import { formatDateTime24 } from '@/lib/format'
 import { cn } from '@/lib/utils'
 
 const VIEW_OPTIONS = [
@@ -63,7 +63,7 @@ function MemberCard({ member, expandable, expanded, onToggle }) {
       <div className="min-w-0 flex-1">
         <p className="truncate text-caption font-bold">{member.name}</p>
         <p className="truncate text-caption text-muted-foreground">
-          F{member.level} · Joined {formatDate(member.joinedAt)}
+          F{member.level} · Joined {formatDateTime24(member.joinedAt)}
         </p>
       </div>
       <StatusBadge tone={member.active ? 'success' : 'neutral'} icon={false} className="h-6 px-2">
@@ -212,7 +212,7 @@ export default function ReferralNetwork({ rootName, members }) {
                         </span>
                       </td>
                       <td className="border-b border-divider py-2.5 text-muted-foreground">{byId[m.parentId]?.name ?? 'You'}</td>
-                      <td className="border-b border-divider py-2.5 text-muted-foreground">{formatDate(m.joinedAt)}</td>
+                      <td className="border-b border-divider py-2.5 text-muted-foreground">{formatDateTime24(m.joinedAt)}</td>
                       <td className="border-b border-divider py-2.5">
                         <StatusBadge tone={m.active ? 'success' : 'neutral'} icon={false}>
                           {m.active ? 'Active' : 'Inactive'}

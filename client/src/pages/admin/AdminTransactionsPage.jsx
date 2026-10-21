@@ -9,7 +9,7 @@ import Pagination from '@/components/admin/Pagination'
 import { ShareSwatch } from '@/components/dashboard/ShareMarker'
 import StatusBadge from '@/components/dashboard/StatusBadge'
 import { useAsync } from '@/hooks/useAsync'
-import { formatDate, formatInt, formatUsdt, formatShares } from '@/lib/format'
+import { formatInt, formatUsdt, formatShares, formatDateTime24 } from '@/lib/format'
 import { ORDER_STATUS, PAYMENT_METHOD_LABEL } from '@/lib/orders'
 import { cn } from '@/lib/utils'
 import { getOrderStats, listAdminOrders } from '@/services/admin.service'
@@ -212,7 +212,7 @@ export default function AdminTransactionsPage() {
                         <span className="font-semibold text-warning">Missing</span>
                       )}
                     </td>
-                    <td className={`${td} text-title text-muted-foreground`}>{formatDate(o.createdAt)}</td>
+                    <td className={`${td} text-title text-muted-foreground`}>{formatDateTime24(o.createdAt)}</td>
                     <td className={td}>
                       <Button variant="outline" className="h-[35px] rounded-lg px-[11.25px] text-title font-bold" onClick={() => setReviewId(o.id)}>
                         Review

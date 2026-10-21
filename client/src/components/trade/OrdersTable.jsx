@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { ShareSwatch } from '@/components/dashboard/ShareMarker'
 import StatusBadge from '@/components/dashboard/StatusBadge'
-import { formatDate, formatUsdt, formatShares } from '@/lib/format'
+import { formatUsdt, formatShares, formatDateTime24 } from '@/lib/format'
 import { ORDER_STATUS } from '@/lib/orders'
 import { certificateUrl } from '@/services/trade.service'
 
@@ -57,7 +57,7 @@ export default function OrdersTable({ orders, emptyText = 'No transactions yet.'
             const status = ORDER_STATUS[o.status]
             return (
               <tr key={o.id} className="transition-colors hover:bg-muted/40">
-                <td className={`${td} pl-[25px]`}>{formatDate(o.createdAt)}</td>
+                <td className={`${td} pl-[25px]`}>{formatDateTime24(o.createdAt)}</td>
                 <td className={`${td} font-semibold text-foreground`}>
                   <Link to={`/trade/orders/${o.id}`} className="hover:underline">
                     {o.orderCode}
