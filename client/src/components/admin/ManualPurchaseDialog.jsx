@@ -173,7 +173,7 @@ export default function ManualPurchaseDialog({ open, user, onClose, onCreated })
             error={errors.note}
             hint={convert ? 'Why these shares are credited without a payment (e.g. migrated holding, correction). Shown on the order and kept in the audit log.' : 'Why this order was created by hand. Kept in the audit log.'}
           >
-            <Textarea value={form.note} onChange={(e) => set('note', e.target.value)} maxLength={500} rows={2} aria-invalid={!!errors.note} />
+            <Textarea value={form.note} onChange={(e) => set('note', e.target.value)} maxLength={500} rows={4} aria-invalid={!!errors.note} />
           </Field>
 
           <label className={cn('flex items-start gap-2.5 rounded-lg border p-3 text-sm', !referredBy && 'opacity-60')}>

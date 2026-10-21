@@ -114,7 +114,7 @@ export default function OrderReviewDialog({ orderId, onClose, onChanged }) {
                   <Row label={order.manual.kind === 'convert' ? 'Share conversion' : 'Created manually'}>
                     {order.manual.kind === 'convert' ? 'Shares credited by an admin, no payment received' : 'By an admin'} · referral commission {order.manual.commissionPaid ? 'paid' : 'not paid'}
                     {order.manual.reference && <span className="block text-muted-foreground">Reference: {order.manual.reference}</span>}
-                    {order.manual.note && <span className="block text-muted-foreground">{order.manual.note}</span>}
+                    {order.manual.note && <span className="block whitespace-pre-line text-muted-foreground">{order.manual.note}</span>}
                   </Row>
                 )}
                 {order.txHash && (

@@ -393,7 +393,11 @@ export default function OrderPaymentPage() {
             ) : (
               order.paymentMethod && <Row label="Payment method">{PAYMENT_METHOD_LABEL[order.paymentMethod]}</Row>
             )}
-            {order.note && <Row label="Note">{order.note}</Row>}
+            {order.note && (
+              <Row label="Note">
+                <span className="block whitespace-pre-line">{order.note}</span>
+              </Row>
+            )}
             {order.txHash && (
               <Row label="Transaction">
                 <a href={bscscanTxUrl(order.txHash)} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-primary hover:underline">
