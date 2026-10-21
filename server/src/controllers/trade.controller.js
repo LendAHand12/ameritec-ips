@@ -5,6 +5,7 @@ import { getSettings } from '../models/Setting.js'
 import { getBalanceCents, getPendingCents } from '../models/WalletTransaction.js'
 import ApiError from '../utils/ApiError.js'
 import { fromCents } from '../utils/money.js'
+import { withLineBreaks } from '../utils/text.js'
 import { roundShares } from '../utils/shares.js'
 import { auditChainPayment, checkBep20Order, completeOrder, nextOrderCode } from '../services/order.service.js'
 import { notifyPaymentNeedsReview } from '../services/telegram.service.js'
@@ -23,7 +24,7 @@ export const toOrderDto = (o) => ({
   paymentMethod: o.paymentMethod ?? null,
   // Orders an admin created by hand: whether it was a share conversion (no payment) and the admin's note
   isConversion: o.manual?.kind === 'convert',
-  note: o.manual?.createdBy ? (o.manual.note ?? null) : null,
+  note: o.manual?.createdBy ? (withLineBreaks(o.manual.note) ?? null) : null,
   txHash: o.txHash ?? null,
   zelleReference: o.zelleReference ?? null,
   paymentError: o.paymentError ?? null,

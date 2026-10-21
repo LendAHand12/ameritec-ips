@@ -4,6 +4,7 @@ import env from '../config/env.js'
 import Order, { ORDER_STATUS } from '../models/Order.js'
 import { getSettings } from '../models/Setting.js'
 import ApiError from '../utils/ApiError.js'
+import { withLineBreaks } from '../utils/text.js'
 import { fromCents, toCents } from '../utils/money.js'
 import { roundShares } from '../utils/shares.js'
 import { completeOrder } from '../services/order.service.js'
@@ -40,7 +41,7 @@ const toAdminOrderDto = (o) => ({
   ...toOrderDto(o),
   user: o.user && { id: o.user.id, fullName: o.user.fullName, email: o.user.email, phone: o.user.phone, referralCode: o.user.referralCode },
   completedBy: o.completedBy ?? null,
-  manual: o.manual?.createdBy ? { reference: o.manual.reference ?? null, note: o.manual.note ?? null, commissionPaid: !!o.manual.commissionPaid, kind: o.manual.kind ?? 'payment' } : null,
+  manual: o.manual?.createdBy ? { reference: o.manual.reference ?? null, note: withLineBreaks(o.manual.note) ?? null, commissionPaid: !!o.manual.commissionPaid, kind: o.manual.kind ?? 'payment' } : null,
   // Background on-chain audit of an instantly-completed wallet payment
   chainCheck: o.chainCheck?.state ? { state: o.chainCheck.state, reason: o.chainCheck.reason ?? null } : null,
   certificate: o.certificate?.filename ? { originalName: o.certificate.originalName, uploadedAt: o.certificate.uploadedAt } : null,
