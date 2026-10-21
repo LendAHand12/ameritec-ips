@@ -40,7 +40,7 @@ const toAdminOrderDto = (o) => ({
   ...toOrderDto(o),
   user: o.user && { id: o.user.id, fullName: o.user.fullName, email: o.user.email, phone: o.user.phone, referralCode: o.user.referralCode },
   completedBy: o.completedBy ?? null,
-  manual: o.manual?.createdBy ? { reference: o.manual.reference ?? null, note: o.manual.note ?? null, commissionPaid: !!o.manual.commissionPaid } : null,
+  manual: o.manual?.createdBy ? { reference: o.manual.reference ?? null, note: o.manual.note ?? null, commissionPaid: !!o.manual.commissionPaid, kind: o.manual.kind ?? 'payment' } : null,
   // Background on-chain audit of an instantly-completed wallet payment
   chainCheck: o.chainCheck?.state ? { state: o.chainCheck.state, reason: o.chainCheck.reason ?? null } : null,
   certificate: o.certificate?.filename ? { originalName: o.certificate.originalName, uploadedAt: o.certificate.uploadedAt } : null,

@@ -10,7 +10,7 @@ import VerifyEmailPage from '@/pages/auth/VerifyEmailPage'
 import ApplicationStatusPage from '@/pages/auth/ApplicationStatusPage'
 import ForgotPasswordPage from '@/pages/auth/ForgotPasswordPage'
 import DashboardPage from '@/pages/user/DashboardPage'
-import TradePage from '@/pages/trade/TradePage'
+// import TradePage from '@/pages/trade/TradePage' // hidden for now
 import OrderPaymentPage from '@/pages/trade/OrderPaymentPage'
 import OrdersPage from '@/pages/trade/OrdersPage'
 import ReferralsPage from '@/pages/user/ReferralsPage'
@@ -67,7 +67,8 @@ const router = createBrowserRouter([
             element: <UserLayout />,
             children: [
               { path: 'dashboard', element: <DashboardPage /> },
-              { path: 'trade', element: <TradePage /> },
+              // Trade page hidden for now
+              // { path: 'trade', element: <TradePage /> },
               { path: 'trade/orders', element: <OrdersPage /> },
               { path: 'trade/orders/:id', element: <OrderPaymentPage /> },
               { path: 'referrals', element: <ReferralsPage /> },

@@ -10,7 +10,7 @@ export async function protect(req, res, next) {
   const token = req.cookies?.[SESSION_COOKIE]
   if (!token) throw new ApiError(401, 'Not authenticated', undefined, 'UNAUTHENTICATED')
 
-  const { sub } = verifyToken(token, TOKEN_PURPOSE.SESSION, { code: 'UNAUTHENTICATED', message: 'Session expired' })
+  const { sub, iat } = verifyToken(token, TOKEN_PURPOSE.SESSION, { code: 'UNAUTHENTICATED', message: 'Session expired' })
   const user = await User.findById(sub)
   // A password reset invalidates every session issued before it
   const invalidatedAt = Math.max(user?.passwordChangedAt?.getTime() ?? 0, user?.sessionsRevokedAt?.getTime() ?? 0)
@@ -41,7 +41,7 @@ export async function protectAdmin(req, res, next) {
   const token = req.cookies?.[ADMIN_SESSION_COOKIE]
   if (!token) throw new ApiError(401, 'Not authenticated', undefined, 'ADMIN_UNAUTHENTICATED')
 
-  const { sub, iat } = verifyToken(token, TOKEN_PURPOSE.ADMIN_SESSION, {
+  const { sub } = verifyToken(token, TOKEN_PURPOSE.ADMIN_SESSION, {
     code: 'ADMIN_UNAUTHENTICATED',
     message: 'Session expired',
   })

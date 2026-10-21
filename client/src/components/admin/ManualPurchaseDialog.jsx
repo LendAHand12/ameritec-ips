@@ -8,11 +8,12 @@ import { Input } from '@/components/ui/input'
 import { Spinner } from '@/components/ui/spinner'
 import { Textarea } from '@/components/ui/textarea'
 import { ShareSwatch } from '@/components/dashboard/ShareMarker'
-import { MIN_SHARES, formatShares, formatUsdt, sharesFor } from '@/lib/format'
+import { formatShares, formatUsdt } from '@/lib/format'
 import { PAYMENT_METHOD_LABEL } from '@/lib/orders'
 import { cn } from '@/lib/utils'
 import { createManualOrder } from '@/services/admin.service'
 
+const CONVERT = 'convert'
 const REFERENCE_HINT = {
   bep20: 'Transaction hash (0x…) — recommended, it can’t be reused for another order',
   zelle: 'Zelle confirmation number',
@@ -35,7 +36,7 @@ function Field({ label, hint, error, children }) {
  */
 export default function ManualPurchaseDialog({ open, user, onClose, onCreated }) {
   const { holdings, referredBy } = user
-  const [form, setForm] = useState({ shareType: 'A', amount: '', paymentMethod: 'zelle', reference: '', note: '', payCommission: !!referredBy })
+  const [form, setForm] = useState({ shareType: 'A', shares: '', paymentMethod: 'zelle', reference: '', note: '', payCommission: false })
   const [confirmed, setConfirmed] = useState(false)
   const [errors, setErrors] = useState({})
   const [saving, setSaving] = useState(false)
@@ -46,29 +47,32 @@ export default function ManualPurchaseDialog({ open, user, onClose, onCreated })
 
   const price = holdings[form.shareType].price
   const rate = holdings[form.shareType].commissionPct
-  const amount = Number(form.amount) || 0
+  const convert = form.paymentMethod === CONVERT
+  // Whole shares; the amount is shares × the class price
+  const shares = Math.floor(Number(form.shares)) || 0
+  const amount = Math.round(shares * price * 100) / 100
   const amountCents = Math.round(amount * 100)
-  const shares = price ? sharesFor(amountCents, Math.round(price * 100)) : 0
-  const validAmount = shares >= MIN_SHARES
+  const validAmount = shares >= 1 && Number(form.shares) === shares
   const commission = Math.floor((amountCents * rate) / 100) / 100
 
   const submit = async (e) => {
     e.preventDefault()
-    if (!validAmount) return setErrors({ amount: 'Enter an amount big enough to buy shares' })
+    if (!validAmount) return setErrors({ shares: 'Enter a whole number of shares' })
+    if (convert && form.note.trim().length < 3) return setErrors({ note: 'Explain this conversion in the internal note' })
     setSaving(true)
     try {
       const { data } = await createManualOrder(user._id, {
         shareType: form.shareType,
-        amount,
+        shares,
         paymentMethod: form.paymentMethod,
         reference: form.reference.trim() || undefined,
         note: form.note.trim() || undefined,
         payCommission: form.payCommission,
       })
-      toast.success(`${data.order.orderCode}: ${formatShares(data.order.shares)} Class ${form.shareType} shares credited`)
+      toast.success(`${data.order.orderCode}: ${formatShares(data.order.shares)} Class ${form.shareType} shares ${convert ? 'converted and credited' : 'credited'}`)
       onCreated(data)
     } catch (err) {
-      setErrors({ amount: err.details?.amount, reference: err.details?.reference })
+      setErrors({ amount: err.details?.amount, shares: err.details?.shares, note: err.details?.note, reference: err.details?.reference })
       if (!err.details) toast.error(err.message)
     } finally {
       setSaving(false)
@@ -81,7 +85,11 @@ export default function ManualPurchaseDialog({ open, user, onClose, onCreated })
         <form onSubmit={submit} noValidate className="space-y-4">
           <DialogHeader>
             <DialogTitle className="text-subheading font-bold">Manual purchase for {user.fullName}</DialogTitle>
-            <DialogDescription>For a payment the user already made that isn’t in the system. The order is completed and the shares are credited immediately.</DialogDescription>
+            <DialogDescription>
+              {convert
+                ? 'Convert shares: credit shares without a new payment. A normal completed order is created, marked as a conversion.'
+                : 'For a payment the user already made that isn’t in the system. The order is completed and the shares are credited immediately.'}
+            </DialogDescription>
           </DialogHeader>
 
           <Field label="Class">
@@ -108,39 +116,41 @@ export default function ManualPurchaseDialog({ open, user, onClose, onCreated })
             </div>
           </Field>
 
-          <Field label="Amount paid (USDT)" error={errors.amount}>
+          <Field label="Number of shares" error={errors.shares}>
             <Input
               type="number"
-              inputMode="decimal"
-              min="0"
-              step="0.01"
-              value={form.amount}
-              onChange={(e) => set('amount', e.target.value)}
+              inputMode="numeric"
+              min="1"
+              step="1"
+              value={form.shares}
+              onChange={(e) => set('shares', e.target.value)}
               placeholder="e.g. 10"
-              aria-invalid={!!errors.amount}
+              aria-invalid={!!errors.shares}
               className="tabular-nums"
             />
             <p className="text-caption text-muted-foreground">
               {validAmount ? (
                 <>
-                  {formatUsdt(amount)} USDT ÷ {formatUsdt(price)} = <span className="font-bold text-foreground">{formatShares(shares)} shares</span>
-                  <span> (3 decimals, rounded from the 4th)</span>
+                  {formatShares(shares)} shares × {formatUsdt(price)} = <span className="font-bold text-foreground">{formatUsdt(amount)} USDT</span>
                 </>
               ) : (
-                'Shares = amount ÷ the class price at this moment.'
+                'Whole shares only. The amount is the number of shares × the class price.'
               )}
             </p>
           </Field>
 
           <Field label="How did they pay?">
             <div role="radiogroup" aria-label="Payment method" className="flex flex-wrap gap-2">
-              {Object.entries(PAYMENT_METHOD_LABEL).map(([value, label]) => (
+              {[...Object.entries(PAYMENT_METHOD_LABEL), [CONVERT, 'Convert shares']].map(([value, label]) => (
                 <button
                   key={value}
                   type="button"
                   role="radio"
                   aria-checked={form.paymentMethod === value}
-                  onClick={() => set('paymentMethod', value)}
+                  onClick={() => {
+                    setForm((f) => ({ ...f, paymentMethod: value, payCommission: value === CONVERT ? false : f.payCommission }))
+                    setConfirmed(false)
+                  }}
                   className={cn(
                     'h-9 rounded-lg border px-3.5 text-sm font-semibold transition-colors outline-none focus-visible:ring-3 focus-visible:ring-ring/30',
                     form.paymentMethod === value ? 'border-primary bg-primary-soft text-primary' : 'bg-card text-muted-foreground hover:border-primary/50',
@@ -152,12 +162,18 @@ export default function ManualPurchaseDialog({ open, user, onClose, onCreated })
             </div>
           </Field>
 
-          <Field label="Payment reference" error={errors.reference} hint={REFERENCE_HINT[form.paymentMethod]}>
-            <Input value={form.reference} onChange={(e) => set('reference', e.target.value)} maxLength={200} spellCheck={false} autoComplete="off" aria-invalid={!!errors.reference} className={form.paymentMethod === 'bep20' ? 'font-mono text-sm' : ''} />
-          </Field>
+          {!convert && (
+            <Field label="Payment reference" error={errors.reference} hint={REFERENCE_HINT[form.paymentMethod]}>
+              <Input value={form.reference} onChange={(e) => set('reference', e.target.value)} maxLength={200} spellCheck={false} autoComplete="off" aria-invalid={!!errors.reference} className={form.paymentMethod === 'bep20' ? 'font-mono text-sm' : ''} />
+            </Field>
+          )}
 
-          <Field label="Internal note" hint="Why this order was created by hand. Kept in the audit log.">
-            <Textarea value={form.note} onChange={(e) => set('note', e.target.value)} maxLength={500} rows={2} />
+          <Field
+            label={convert ? 'Internal note (required)' : 'Internal note'}
+            error={errors.note}
+            hint={convert ? 'Why these shares are credited without a payment (e.g. migrated holding, correction). Shown on the order and kept in the audit log.' : 'Why this order was created by hand. Kept in the audit log.'}
+          >
+            <Textarea value={form.note} onChange={(e) => set('note', e.target.value)} maxLength={500} rows={2} aria-invalid={!!errors.note} />
           </Field>
 
           <label className={cn('flex items-start gap-2.5 rounded-lg border p-3 text-sm', !referredBy && 'opacity-60')}>
@@ -188,7 +204,7 @@ export default function ManualPurchaseDialog({ open, user, onClose, onCreated })
             <span className="space-y-0.5">
               <span className="flex items-center gap-1.5 font-bold">
                 <AlertTriangleIcon className="size-4 text-warning" />
-                I confirmed the payment was received
+                {convert ? 'I confirm these shares should be credited' : 'I confirmed the payment was received'}
               </span>
               <span className="block">Shares are credited right away and can’t be undone from here. This action is recorded in the audit log.</span>
             </span>
@@ -200,7 +216,7 @@ export default function ManualPurchaseDialog({ open, user, onClose, onCreated })
             </Button>
             <Button type="submit" disabled={saving || !confirmed || !validAmount}>
               {saving && <Spinner />}
-              Create order &amp; credit shares
+              {convert ? 'Convert & credit shares' : 'Create order & credit shares'}
             </Button>
           </DialogFooter>
         </form>

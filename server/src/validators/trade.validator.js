@@ -3,7 +3,8 @@ import { SHARE_TYPES } from '../models/Order.js'
 
 export const createOrderSchema = z.object({
   shareType: z.enum(SHARE_TYPES, { error: 'Choose a class' }),
-  amount: z.coerce.number({ error: 'Enter an amount' }).positive('Enter an amount').max(10_000_000, 'Amount is too large'),
+  // Shares are whole numbers; the amount to pay is shares × the class price
+  shares: z.coerce.number({ error: 'Enter the number of shares' }).int('Shares must be a whole number').positive('Enter the number of shares').max(100_000_000, 'Too many shares'),
 })
 
 export const submitPaymentSchema = z.discriminatedUnion('method', [

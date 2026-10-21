@@ -36,6 +36,8 @@ const orderSchema = new mongoose.Schema(
       reference: String, // tx hash / Zelle confirmation / bank reference
       note: String,
       commissionPaid: Boolean, // whether the referrer was paid for this order
+      // 'convert': the admin entered a number of shares to credit (no new payment); default is a payment received
+      kind: { type: String, enum: ['payment', 'convert'], default: 'payment' },
     },
     // Background audit of a wallet payment that was accepted instantly; only used to alert admins
     chainCheck: {

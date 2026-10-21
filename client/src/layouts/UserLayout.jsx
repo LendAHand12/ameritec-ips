@@ -20,7 +20,8 @@ import { getTradeConfig } from '@/services/trade.service'
 
 const USER_NAV = [
   { to: '/dashboard', label: 'Dashboard' },
-  { to: '/trade', label: 'Trade' },
+  // Trade page hidden for now — uncomment this item and the route in router.jsx to bring it back
+  // { to: '/trade', label: 'Trade' },
   { to: '/referrals', label: 'Referral & Commission' },
   { to: '/guide', label: 'Guide' },
   { to: '/support', label: 'Support' },

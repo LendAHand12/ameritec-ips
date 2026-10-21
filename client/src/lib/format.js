@@ -13,6 +13,7 @@ export const formatShares = (n) => shareFmt.format(n ?? 0)
 /** Mirrors the server: shares for `amountCents` at `priceCents`, rounded at the 4th decimal digit (3 kept). */
 export const sharesFor = (amountCents, priceCents) => Math.round((amountCents * 1000) / priceCents) / 1000
 export const MIN_SHARES = 0.001
+export const roundShares = (n) => Math.round((n + Number.EPSILON) * 1000) / 1000
 
 export const formatUsdt = (n) => usdt.format(n)
 export const formatInt = (n) => integer.format(n)

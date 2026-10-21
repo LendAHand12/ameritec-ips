@@ -11,15 +11,22 @@ export const listAdminOrdersQuerySchema = z.object({
 })
 
 /** An admin buys shares on behalf of a user whose payment never showed up in the system. */
-export const manualOrderSchema = z.object({
+export const manualOrderSchema = z
+  .object({
   shareType: z.enum(SHARE_TYPES, { error: 'Choose a class' }),
-  amount: z.coerce.number({ error: 'Enter an amount' }).positive('Enter an amount').max(10_000_000, 'Amount is too large'),
-  paymentMethod: z.enum(PAYMENT_METHODS, { error: 'Choose how the user paid' }),
+  // Whole shares; the amount is shares × the class price
+  shares: z.coerce.number({ error: 'Enter the number of shares' }).int('Shares must be a whole number').positive('Enter the number of shares').max(100_000_000, 'Too many shares'),
+  // 'convert' = shares credited without a payment
+  paymentMethod: z.enum([...PAYMENT_METHODS, 'convert'], { error: 'Choose how the user paid' }),
   // tx hash, Zelle confirmation number or bank reference — optional but recommended
   reference: z.string().trim().max(200).optional(),
   note: z.string().trim().max(500).optional(),
   payCommission: z.boolean({ error: 'Choose whether to pay the referral commission' }),
-})
+  })
+  .superRefine((d, ctx) => {
+    // The note explains why shares were credited without a payment, so it can't be skipped
+    if (d.paymentMethod === 'convert' && (d.note ?? '').length < 3) ctx.addIssue({ code: 'custom', path: ['note'], message: 'Explain this conversion in the internal note' })
+  })
 
 export const rejectOrderSchema = z.object({
   reason: z.string().trim().min(1, 'Enter a reason').max(500),

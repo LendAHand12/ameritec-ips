@@ -4,8 +4,8 @@ import Order, { ORDER_STATUS } from '../models/Order.js'
 import { getSettings } from '../models/Setting.js'
 import { getBalanceCents, getPendingCents } from '../models/WalletTransaction.js'
 import ApiError from '../utils/ApiError.js'
-import { fromCents, toCents } from '../utils/money.js'
-import { MIN_SHARES, roundShares, sharesFor } from '../utils/shares.js'
+import { fromCents } from '../utils/money.js'
+import { roundShares } from '../utils/shares.js'
 import { auditChainPayment, checkBep20Order, completeOrder, nextOrderCode } from '../services/order.service.js'
 import { notifyPaymentNeedsReview } from '../services/telegram.service.js'
 
@@ -121,21 +121,17 @@ export async function getPortfolio(req, res) {
 }
 
 export async function createOrder(req, res) {
-  const { shareType, amount } = req.body
+  const { shareType, shares } = req.body
   const settings = await getSettings()
   const priceCents = settings.shares[shareType].priceCents
   if (!priceCents) throw new ApiError(400, 'This class is not available right now')
 
-  // The user pays exactly the amount they entered and gets amount ÷ price shares, fractions included
-  const amountCents = toCents(amount)
-  const shares = sharesFor(amountCents, priceCents)
-  if (shares < MIN_SHARES) {
-    throw new ApiError(400, 'That amount is too small to buy any shares', { amount: 'Amount is too small' })
-  }
+  // Whole shares: the user pays shares × price, to the cent
+  const amountCents = shares * priceCents
   const { firstPurchase, minCents } = await minPurchaseFor(req.user._id, settings)
   if (amountCents < minCents) {
     const msg = `Minimum ${firstPurchase ? 'first purchase' : 'purchase'} is ${fromCents(minCents).toFixed(2)} USDT`
-    throw new ApiError(400, msg, { amount: msg })
+    throw new ApiError(400, msg, { shares: msg })
   }
 
   const order = await Order.create({

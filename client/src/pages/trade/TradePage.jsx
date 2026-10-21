@@ -10,12 +10,12 @@ import { Panel, PanelHeader } from '@/components/dashboard/Panel'
 import { ShareSwatch } from '@/components/dashboard/ShareMarker'
 import OrdersTable from '@/components/trade/OrdersTable'
 import { useAsync } from '@/hooks/useAsync'
-import { formatInt, formatUsdt, formatShares, MIN_SHARES, sharesFor } from '@/lib/format'
+import { formatInt, formatUsdt, formatShares } from '@/lib/format'
 import { cn } from '@/lib/utils'
 import { walletConfigured } from '@/lib/wallet-config'
 import { createOrder, getTradeConfig, listOrders } from '@/services/trade.service'
 
-const QUICK_AMOUNTS = [100, 500, 1000, 5000]
+const QUICK_SHARES = [10, 50, 100, 500]
 
 function SummaryRow({ label, children, strong }) {
   return (
@@ -61,31 +61,31 @@ export default function TradePage() {
   const navigate = useNavigate()
   const { data: config, error } = useAsync(getTradeConfig, [])
   const { data: orders } = useAsync(() => listOrders({ limit: 5 }), [])
-  const [amountInput, setAmountInput] = useState('1000')
+  const [sharesInput, setSharesInput] = useState('100')
   const [shareType, setShareType] = useState('A')
   const [confirming, setConfirming] = useState(false)
   const [paymentMethod, setPaymentMethod] = useState(null)
   const [submitting, setSubmitting] = useState(false)
 
   const share = config?.shares.find((s) => s.type === shareType)
-  const amount = Number(amountInput) || 0
   const priceCents = share ? Math.round(share.price * 100) : 0
-  // You pay exactly what you enter and get amount ÷ price shares, fractions included (3 decimals, rounded at the 4th)
-  const amountCents = Math.round(amount * 100)
-  const shares = priceCents ? sharesFor(amountCents, priceCents) : 0
-  const total = amountCents / 100
-  const roundedShares = priceCents > 0 && shares > 0 && (amountCents * 1000) % priceCents !== 0
+  // You choose a whole number of shares and pay shares × price
+  const shares = Math.floor(Number(sharesInput)) || 0
+  const validShares = shares >= 1 && Number(sharesInput) === shares
+  const amountCents = shares * priceCents
+  const amount = amountCents / 100
+  const total = amount
   const hasPaymentMethod = !!((config?.paymentMethods.bep20 && walletConfigured) || config?.paymentMethods.zelle)
   const minCents = Math.round((config?.minPurchase.amount ?? 0) * 100)
   const minLabel = config?.minPurchase.firstPurchase ? 'Minimum first purchase' : 'Minimum purchase'
-  const belowMin = shares >= MIN_SHARES && amountCents < minCents
+  const belowMin = validShares && amountCents < minCents
   const amountError =
-    !amountInput || !share
+    !sharesInput || !share
       ? ''
-      : shares < MIN_SHARES
-        ? 'Amount is too small to buy any shares'
+      : !validShares
+        ? 'Enter a whole number of shares'
         : belowMin
-          ? `${minLabel} is ${formatUsdt(minCents / 100)} USDT`
+          ? `${minLabel} is ${formatUsdt(minCents / 100)} USDT (${formatInt(Math.ceil(minCents / priceCents))} shares at this price)`
           : ''
 
   const methodOptions = [
@@ -112,7 +112,7 @@ export default function TradePage() {
     if (!selectedMethod) return
     setSubmitting(true)
     try {
-      const { order } = await createOrder({ shareType, amount: total })
+      const { order } = await createOrder({ shareType, shares })
       navigate(`/trade/orders/${order.id}?method=${selectedMethod.value}`)
     } catch (err) {
       toast.error(err.message)
@@ -149,12 +149,12 @@ export default function TradePage() {
               <PanelHeader
                 className="border-b border-divider pb-[25px]"
                 title="Buy Shares"
-                description="Enter the amount you would like to invest."
+                description="Choose how many shares you would like to buy."
               />
 
               <div className="pt-[25px]">
-                <label htmlFor="amount" className="text-caption font-semibold">
-                  Amount to invest (USDT)
+                <label htmlFor="shares" className="text-caption font-semibold">
+                  Number of shares
                 </label>
                 <div
                   className={cn(
@@ -163,19 +163,19 @@ export default function TradePage() {
                   )}
                 >
                   <input
-                    id="amount"
+                    id="shares"
                     type="number"
-                    inputMode="decimal"
-                    min="0"
-                    step="any"
-                    value={amountInput}
-                    onChange={(e) => setAmountInput(e.target.value)}
+                    inputMode="numeric"
+                    min="1"
+                    step="1"
+                    value={sharesInput}
+                    onChange={(e) => setSharesInput(e.target.value)}
                     className="h-full w-full min-w-0 flex-1 bg-transparent px-[18.75px] text-subheading font-semibold tabular-nums outline-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none"
                     aria-invalid={!!amountError}
                     aria-describedby="amount-error"
                   />
                   <span className="flex h-[37.5px] items-center border-l border-divider px-[17.5px] text-caption font-semibold text-muted-foreground">
-                    USDT
+                    Shares
                   </span>
                 </div>
                 {amountError ? (
@@ -190,14 +190,14 @@ export default function TradePage() {
                   )
                 )}
                 <div className="mt-2.5 grid grid-cols-4 gap-[8.75px]">
-                  {QUICK_AMOUNTS.map((v) => (
+                  {QUICK_SHARES.map((v) => (
                     <button
                       key={v}
                       type="button"
-                      onClick={() => setAmountInput(String(v))}
+                      onClick={() => setSharesInput(String(v))}
                       className={cn(
                         'h-10 rounded-[7.5px] border bg-muted text-caption font-semibold text-muted-foreground transition-colors hover:border-primary/50 hover:text-foreground',
-                        amount === v && 'border-primary text-primary',
+                        shares === v && 'border-primary text-primary',
                       )}
                     >
                       {formatInt(v)}
@@ -226,20 +226,20 @@ export default function TradePage() {
                   </p>
                 </div>
                 <span className="mx-auto flex size-[30px] items-center justify-center rounded-full border bg-card text-title text-muted-foreground">
-                  ÷
+                  ×
                 </span>
                 <div className="space-y-[6.25px] text-right">
-                  <p className="text-caption text-muted-foreground">Estimated Shares</p>
+                  <p className="text-caption text-muted-foreground">You Pay</p>
                   <p>
-                    <span className="text-2xl font-bold text-primary tabular-nums">{formatShares(shares)}</span>{' '}
-                    <span className="text-caption font-bold text-muted-foreground">Shares</span>
+                    <span className="text-2xl font-bold text-primary tabular-nums">{formatUsdt(total)}</span>{' '}
+                    <span className="text-caption font-bold text-muted-foreground">USDT</span>
                   </p>
                 </div>
               </div>
               <p className="flex flex-wrap items-center justify-center gap-[5px] pt-[11.25px] text-caption text-muted-foreground">
                 <CalculatorIcon className="size-[18.75px]" aria-hidden />
-                {formatUsdt(amount)} USDT ÷ {formatUsdt(share.price)} USDT =
-                <span className="font-semibold text-foreground">{formatShares(shares)} Shares</span>
+                {formatShares(shares)} Shares × {formatUsdt(share.price)} USDT =
+                <span className="font-semibold text-foreground">{formatUsdt(total)} USDT</span>
               </p>
 
               <div className="mt-[25px] rounded-lg border p-5">
@@ -248,10 +248,9 @@ export default function TradePage() {
                   <span className="rounded-full bg-muted px-[8.75px] py-[5px] text-caption text-muted-foreground">Estimated</span>
                 </div>
                 <dl className="pt-[7.5px]">
-                  <SummaryRow label="Investment Amount">{formatUsdt(amount)} USDT</SummaryRow>
                   <SummaryRow label="Class">{share.label}</SummaryRow>
+                  <SummaryRow label="Shares">{formatShares(shares)}</SummaryRow>
                   <SummaryRow label="Price">{formatUsdt(share.price)} USDT / Share</SummaryRow>
-                  <SummaryRow label="Estimated Shares">{formatShares(shares)}</SummaryRow>
                   <SummaryRow label="Transaction Fee">
                     <span className="text-success">0 USDT</span>
                   </SummaryRow>
@@ -259,15 +258,10 @@ export default function TradePage() {
                     {formatUsdt(total)} USDT
                   </SummaryRow>
                 </dl>
-                {roundedShares && (
-                  <p className="mt-2 rounded-md bg-muted px-3 py-2 text-caption text-muted-foreground">
-                    You pay exactly {formatUsdt(total)} USDT. Shares are counted to 3 decimal places (rounded from the 4th), so you get {formatShares(shares)} shares.
-                  </p>
-                )}
               </div>
 
               <div className="pt-5">
-                <Button size="xl" className="w-full" disabled={shares < MIN_SHARES || belowMin || !hasPaymentMethod} onClick={() => setConfirming(true)}>
+                <Button size="xl" className="w-full" disabled={!validShares || belowMin || !hasPaymentMethod} onClick={() => setConfirming(true)}>
                   Review Purchase
                   <ArrowRightIcon />
                 </Button>

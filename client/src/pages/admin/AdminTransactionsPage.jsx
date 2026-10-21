@@ -198,8 +198,8 @@ export default function AdminTransactionsPage() {
                         {status.label}
                       </StatusBadge>
                       {o.manual && (
-                        <span className="ml-2 rounded-md bg-muted px-1.5 py-0.5 text-caption font-semibold text-muted-foreground" title="Created by hand by an admin">
-                          Manual
+                        <span className="ml-2 rounded-md bg-muted px-1.5 py-0.5 text-caption font-semibold text-muted-foreground" title={o.manual.kind === 'convert' ? 'Shares credited by an admin (conversion, no payment)' : 'Created by hand by an admin'}>
+                          {o.manual.kind === 'convert' ? 'Convert' : 'Manual'}
                         </span>
                       )}
                     </td>

@@ -3,8 +3,6 @@ import { getSettings } from '../models/Setting.js'
 import User, { USER_STATUS } from '../models/User.js'
 import WalletTransaction from '../models/WalletTransaction.js'
 import ApiError from '../utils/ApiError.js'
-import { toCents } from '../utils/money.js'
-import { MIN_SHARES, sharesFor } from '../utils/shares.js'
 import { describeAudit, investorOf } from '../services/audit.service.js'
 import { completeOrder, nextOrderCode } from '../services/order.service.js'
 import { toOrderDto } from './trade.controller.js'
@@ -18,7 +16,10 @@ const TX_HASH = /^0x[0-9a-fA-F]{64}$/
  */
 export async function createManualOrder(req, res) {
   describeAudit(req, { record: { type: 'user', id: req.params.id } })
-  const { shareType, amount, paymentMethod, reference, note, payCommission } = req.body
+  const { shareType, shares, reference, note, payCommission } = req.body
+  const convert = req.body.paymentMethod === 'convert'
+  // A conversion is not a payment: stored as 'other' and marked as a conversion
+  const paymentMethod = convert ? 'other' : req.body.paymentMethod
   const user = await User.findById(req.params.id)
   if (!user) throw new ApiError(404, 'User not found')
   if (user.deletedAt) throw new ApiError(409, 'This user has been deleted')
@@ -27,9 +28,8 @@ export async function createManualOrder(req, res) {
   const settings = await getSettings()
   const priceCents = settings.shares[shareType].priceCents
   if (!priceCents) throw new ApiError(400, 'This class is not available right now')
-  const amountCents = toCents(amount)
-  const shares = sharesFor(amountCents, priceCents)
-  if (shares < MIN_SHARES) throw new ApiError(400, 'That amount is too small to buy any shares', { amount: 'Amount is too small' })
+  // Whole shares; the amount is shares × price
+  const amountCents = shares * priceCents
 
   // A tx hash can only ever pay for one order
   const txHash = paymentMethod === 'bep20' && reference && TX_HASH.test(reference) ? reference.toLowerCase() : undefined
@@ -47,7 +47,7 @@ export async function createManualOrder(req, res) {
     paymentMethod,
     ...(txHash && { txHash }),
     ...(paymentMethod === 'zelle' && reference && { zelleReference: reference }),
-    manual: { createdBy: req.admin._id, reference, note, commissionPaid: payCommission },
+    manual: { createdBy: req.admin._id, reference, note, commissionPaid: payCommission, kind: convert ? 'convert' : 'payment' },
   })
   const completed = await completeOrder(order._id, { by: 'admin', adminId: req.admin._id, payCommission })
   if (!completed) throw new ApiError(500, 'Could not complete the order')
@@ -56,7 +56,7 @@ export async function createManualOrder(req, res) {
   describeAudit(req, {
     investor: investorOf(user),
     record: { type: 'order', id: completed.id, ref: completed.orderCode },
-    description: `Manual order ${completed.orderCode}: ${amountCents / 100} USDT → ${shares} Class ${shareType} shares for ${user.fullName}; referral commission ${payCommission ? (commission ? `paid (${commission.amountCents / 100} USDT, ${commission.status})` : 'requested but none due (no referrer)') : 'not paid'}${note ? ` — ${note}` : ''}`,
+    description: `Manual ${convert ? 'share conversion' : 'order'} ${completed.orderCode}: ${amountCents / 100} USDT${convert ? ' (value at the current price)' : ''} → ${shares} Class ${shareType} shares for ${user.fullName}; referral commission ${payCommission ? (commission ? `paid (${commission.amountCents / 100} USDT, ${commission.status})` : 'requested but none due (no referrer)') : 'not paid'}${note ? ` — ${note}` : ''}`,
   })
   res.status(201).json({
     data: {
