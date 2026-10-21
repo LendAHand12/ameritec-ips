@@ -21,6 +21,9 @@ export const toOrderDto = (o) => ({
   amount: fromCents(o.amountCents),
   status: o.status,
   paymentMethod: o.paymentMethod ?? null,
+  // Orders an admin created by hand: whether it was a share conversion (no payment) and the admin's note
+  isConversion: o.manual?.kind === 'convert',
+  note: o.manual?.createdBy ? (o.manual.note ?? null) : null,
   txHash: o.txHash ?? null,
   zelleReference: o.zelleReference ?? null,
   paymentError: o.paymentError ?? null,

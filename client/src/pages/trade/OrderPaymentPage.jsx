@@ -385,10 +385,15 @@ export default function OrderPaymentPage() {
             <Row label="Transaction fee">
               <span className="text-success">0 USDT</span>
             </Row>
-            <Row label="Total payment">
+            <Row label={order.isConversion ? 'Order value' : 'Total payment'}>
               <span className="text-title">{formatUsdt(order.amount)} USDT</span>
             </Row>
-            {order.paymentMethod && <Row label="Payment method">{PAYMENT_METHOD_LABEL[order.paymentMethod]}</Row>}
+            {order.isConversion ? (
+              <Row label="Type">Share conversion</Row>
+            ) : (
+              order.paymentMethod && <Row label="Payment method">{PAYMENT_METHOD_LABEL[order.paymentMethod]}</Row>
+            )}
+            {order.note && <Row label="Note">{order.note}</Row>}
             {order.txHash && (
               <Row label="Transaction">
                 <a href={bscscanTxUrl(order.txHash)} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-primary hover:underline">
