@@ -78,7 +78,7 @@ export default function StepAccountInfo({ defaultValues, serverErrors, onNext })
           />
         </FormField>
 
-        <FormField id="referralCode" label="Referral Code" error={errors.referralCode}>
+        <FormField id="referralCode" label="Referral Code" required error={errors.referralCode}>
           <Input
             id="referralCode"
             size="lg"

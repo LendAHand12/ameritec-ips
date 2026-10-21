@@ -3,6 +3,7 @@ import { z } from 'zod'
 import * as account from '../controllers/account.controller.js'
 import { protect } from '../middlewares/auth.js'
 import { authLimiter, otpLimiter } from '../middlewares/rateLimit.js'
+import { kycUpload } from '../middlewares/upload.js'
 import { validate } from '../middlewares/validate.js'
 import { passwordSchema } from '../validators/auth.validator.js'
 
@@ -37,6 +38,8 @@ router.use(protect)
 
 router.get('/', account.getAccount)
 router.get('/face-image', account.getFaceImage)
+router.get('/identity-image/:side', account.getIdentityImage)
+router.post('/identity-photo/:side', authLimiter, kycUpload.single('photo'), account.uploadIdentityPhoto)
 router.patch('/phone', otpLimiter, validate(updatePhoneSchema), account.updatePhone)
 router.post('/password', otpLimiter, validate(changePasswordSchema), account.changePassword)
 router.post('/2fa/setup', otpLimiter, validate(setupTwoFactorSchema), account.setupTwoFactor)

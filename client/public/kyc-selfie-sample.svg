@@ -1,0 +1,34 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="480" height="320" viewBox="0 0 480 320" role="img" aria-labelledby="t d">
+  <title id="t">Example: a person holding their ID next to their face</title>
+  <desc id="d">A person facing the camera holds an identity card beside their face. Both the face and the card are fully visible.</desc>
+  <rect width="480" height="320" rx="16" fill="#f2f2f2"/>
+  <rect x="14" y="14" width="452" height="292" rx="12" fill="#ffffff" stroke="#e3e3e3"/>
+  <!-- body -->
+  <path d="M70 306c0-62 40-96 98-96s98 34 98 96z" fill="#5e5e5e"/>
+  <rect x="150" y="186" width="36" height="34" rx="10" fill="#e8b894"/>
+  <!-- head -->
+  <ellipse cx="168" cy="132" rx="52" ry="60" fill="#f1c9a5"/>
+  <path d="M116 126c-4-46 28-70 56-70 34 0 60 26 52 70-12-22-34-32-52-32s-40 10-56 32z" fill="#2b2b2b"/>
+  <circle cx="148" cy="136" r="5" fill="#2b2b2b"/>
+  <circle cx="190" cy="136" r="5" fill="#2b2b2b"/>
+  <path d="M152 164c10 10 26 10 36 0" fill="none" stroke="#a55a3c" stroke-width="4" stroke-linecap="round"/>
+  <!-- arm + hand -->
+  <path d="M262 306c-6-58 0-92 38-110l22 14c-16 22-14 56-8 96z" fill="#5e5e5e"/>
+  <rect x="296" y="168" width="28" height="42" rx="12" fill="#f1c9a5"/>
+  <!-- ID card -->
+  <g transform="rotate(-4 340 160)">
+    <rect x="262" y="92" width="170" height="108" rx="10" fill="#ffffff" stroke="#b3b3b3" stroke-width="2"/>
+    <rect x="262" y="92" width="170" height="26" rx="10" fill="#e61e32"/>
+    <rect x="262" y="106" width="170" height="12" fill="#e61e32"/>
+    <circle cx="298" cy="150" r="17" fill="#d9d9d9"/>
+    <path d="M272 192c0-17 12-26 26-26s26 9 26 26z" fill="#d9d9d9"/>
+    <rect x="334" y="132" width="82" height="8" rx="4" fill="#979797"/>
+    <rect x="334" y="150" width="64" height="8" rx="4" fill="#b3b3b3"/>
+    <rect x="334" y="168" width="74" height="8" rx="4" fill="#b3b3b3"/>
+    <!-- fingers over the card edge -->
+    <rect x="290" y="176" width="46" height="18" rx="9" fill="#f1c9a5"/>
+  </g>
+  <!-- check marks -->
+  <circle cx="440" cy="40" r="16" fill="#16825d"/>
+  <path d="M432 40l6 6 11-12" fill="none" stroke="#fff" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

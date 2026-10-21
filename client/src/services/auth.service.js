@@ -14,7 +14,7 @@ export function register({ account, identity, twoFactor }) {
   form.append('documentType', identity.documentType)
   form.append('documentFront', identity.front)
   form.append('documentBack', identity.back)
-  if (identity.supporting) form.append('supportingDocument', identity.supporting)
+  form.append('supportingDocument', identity.supporting)
   // Optional at sign-up: two-factor can be switched on later (the face scan happens after sign-in)
   if (twoFactor?.twoFactorToken) form.append('twoFactorToken', twoFactor.twoFactorToken)
   return api.post('/auth/register', form)

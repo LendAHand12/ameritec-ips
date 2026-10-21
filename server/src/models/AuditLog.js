@@ -18,6 +18,7 @@ export const AUDIT_RECORD_TYPES = {
   article: 'Help Article',
   admin: 'Admin Account',
   withdrawal: 'Withdrawal',
+  notification: 'Notification',
 }
 
 /** Every admin action, by key. Category drives the dashboard counters. */
@@ -55,6 +56,7 @@ export const AUDIT_ACTIONS = {
   'admin.role_create': { category: 'security', label: 'Created Admin Role' },
   'admin.role_update': { category: 'security', label: 'Updated Admin Role' },
   'admin.role_delete': { category: 'security', label: 'Deleted Admin Role' },
+  'notification.send': { category: 'users', label: 'Sent Notification' },
   'wallet.adjust': { category: 'referrals', label: 'Adjusted Balance' },
   'withdrawal.paid': { category: 'referrals', label: 'Marked Withdrawal Paid' },
   'withdrawal.reject': { category: 'referrals', label: 'Rejected Withdrawal' },

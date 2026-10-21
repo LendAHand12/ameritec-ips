@@ -1,9 +1,10 @@
+import fs from 'fs'
+import path from 'path'
 import jwt from 'jsonwebtoken'
 import env from '../config/env.js'
 import User, { FACE_STATUS } from '../models/User.js'
 import ApiError from '../utils/ApiError.js'
 import { ensureApplicationId } from '../utils/applicationId.js'
-import { maskEmail, maskPhone } from '../utils/mask.js'
 import { normalizePhone } from '../utils/normalize.js'
 import { SESSION_COOKIE } from '../middlewares/auth.js'
 import { TOKEN_PURPOSE, signToken, verifyToken } from '../utils/tokens.js'
@@ -31,15 +32,15 @@ function reissueSession(req, res, user) {
   })
 }
 
-/** Profile + security facts for the Account & Security page. Email and phone come back masked. */
+/** Profile + security facts for the Account & Security page (the person's own details, shown in full). */
 export async function getAccount(req, res) {
   const user = req.user
   await ensureApplicationId(user)
   res.json({
     profile: {
       fullName: user.fullName,
-      email: maskEmail(user.email),
-      phone: maskPhone(user.phone),
+      email: user.email,
+      phone: user.phone,
       phoneCountry: user.phoneCountry ?? null,
       applicationId: user.applicationId,
       referralCode: user.referralCode,
@@ -53,6 +54,8 @@ export async function getAccount(req, res) {
       submittedAt: user.emailVerifiedAt ?? user.createdAt,
       reviewedAt: user.reviewedAt ?? null,
       faceVerified: !!user.faceVerified,
+      // The 3 photos an account needs before it can be approved: document front, back, and the person holding it
+      photos: identityPhotos(user),
       // Optional at sign-up: "none" until the person adds one, then pending → approved / rejected by an admin
       face: {
         status: user.faceVerified ? FACE_STATUS.APPROVED : (user.face?.status ?? FACE_STATUS.NONE),
@@ -67,6 +70,46 @@ export async function getAccount(req, res) {
       passwordChangedAt: user.passwordChangedAt ?? null,
     },
   })
+}
+
+const PHOTO_FIELDS = { front: 'frontImage', back: 'backImage', selfie: 'supportingImage' }
+
+// Once all 3 photos are in, they are locked: nothing can be added or replaced from the account any more
+const identityPhotos = (user) => {
+  const photos = { front: !!user.identity?.frontImage, back: !!user.identity?.backImage, selfie: !!user.identity?.supportingImage }
+  const complete = photos.front && photos.back && photos.selfie
+  return { ...photos, complete, locked: complete }
+}
+
+/**
+ * Adds the missing photo (usually the one of the person holding the document) or replaces the front / back
+ * while the set is still incomplete. A complete set of 3 can't be changed here.
+ */
+export async function uploadIdentityPhoto(req, res) {
+  const field = PHOTO_FIELDS[req.params.side]
+  if (!field) throw new ApiError(404, 'Unknown photo')
+  const discard = () => (req.file ? fs.promises.unlink(req.file.path).catch(() => {}) : undefined)
+  if (!req.file) throw new ApiError(400, 'Choose a photo', { photo: 'Choose a photo' }, 'VALIDATION_ERROR')
+
+  const user = await User.findById(req.user._id)
+  if (identityPhotos(user).locked) {
+    await discard()
+    throw new ApiError(409, 'All 3 photos are submitted and can no longer be changed. Contact support if something is wrong.', undefined, 'IDENTITY_PHOTOS_LOCKED')
+  }
+  const previous = user.identity?.[field]
+  user.identity[field] = req.file.filename
+  await user.save()
+  if (previous) await fs.promises.unlink(path.join(path.resolve(env.kyc.dir), path.basename(previous))).catch(() => {})
+  res.status(201).json({ photos: identityPhotos(user) })
+}
+
+/** One of the signed-in user's own identity photos. */
+export async function getIdentityImage(req, res) {
+  const field = PHOTO_FIELDS[req.params.side]
+  const filename = field && req.user.identity?.[field]
+  if (!filename) throw new ApiError(404, 'Image not found')
+  res.set('Cache-Control', 'private, no-store')
+  res.sendFile(path.basename(filename), { root: path.resolve(env.kyc.dir) })
 }
 
 /** The signed-in user's own face scan photo. */
@@ -89,7 +132,7 @@ export async function updatePhone(req, res) {
   user.phone = phone
   user.phoneCountry = phoneCountry
   await user.save()
-  res.json({ phone: maskPhone(user.phone) })
+  res.json({ phone: user.phone })
 }
 
 /** Needs the current password and an authenticator code; every other device is signed out. */

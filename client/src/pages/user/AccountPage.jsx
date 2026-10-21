@@ -1,6 +1,6 @@
-import { useState } from 'react'
+import { useId, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { ArrowRightIcon, CheckIcon, KeyRoundIcon, ScanFaceIcon, LaptopIcon, LayoutGridIcon, MonitorIcon, ShieldCheckIcon, SmartphoneIcon, UserRoundIcon } from 'lucide-react'
+import { ArrowDownToLineIcon, ArrowRightIcon, CheckIcon, KeyRoundIcon, ScanFaceIcon, LaptopIcon, LayoutGridIcon, MonitorIcon, ShieldCheckIcon, SmartphoneIcon, UserRoundIcon } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Spinner } from '@/components/ui/spinner'
@@ -15,7 +15,9 @@ import { useAuth } from '@/hooks/useAuth'
 import { DOCUMENT_TYPE_LABEL, KYC_STATUS } from '@/lib/adminUsers'
 import { formatDate, formatDateTime, formatDateTime24 } from '@/lib/format'
 import { cn } from '@/lib/utils'
-import { faceImageUrl, getAccount, getSession, signOutOtherSessions } from '@/services/account.service'
+import { faceImageUrl, getAccount, getSession, identityImageUrl, signOutOtherSessions, uploadIdentityPhoto } from '@/services/account.service'
+import { ACCEPTED_IMAGE_TYPES, MAX_IMAGE_SIZE_MB, validateImageFile } from '@/components/auth/DocumentUpload'
+import SelfieSample, { SELFIE_SAMPLE_SRC } from '@/components/auth/SelfieSample'
 import { startFaceScan } from '@/services/kyc.service'
 
 const TABS = [
@@ -126,7 +128,118 @@ const FACE_STATUS = {
   rejected: { label: 'Rejected', tone: 'danger' },
 }
 
-function IdentityTab({ account, onAddFace, startingFace }) {
+const PHOTO_EXAMPLES = { front: '/kyc-sample-front.svg', back: '/kyc-sample-back.svg', selfie: SELFIE_SAMPLE_SRC }
+
+function PhotoTile({ side, label, done, locked, version, busy, onPick, placeholderImage }) {
+  const inputId = useId()
+  const [failed, setFailed] = useState(false)
+  const showImage = done && !failed
+  return (
+    <div className="space-y-1.5">
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-caption font-semibold">{label}</span>
+        <span className={cn('text-caption font-semibold', done ? 'text-success' : 'text-primary')}>{done ? (locked ? 'Locked' : 'Submitted') : 'Required'}</span>
+      </div>
+      <label
+        htmlFor={locked || busy ? undefined : inputId}
+        className={cn(
+          'relative flex aspect-[4/3] w-full flex-col items-center justify-center gap-1 overflow-hidden rounded-lg border bg-muted text-center',
+          !locked && !busy && 'cursor-pointer hover:border-primary',
+          !done && 'border-dashed border-border-strong',
+        )}
+      >
+        {showImage ? (
+          <img src={identityImageUrl(side, version)} alt={label} className="size-full bg-card object-contain" onError={() => setFailed(true)} />
+        ) : placeholderImage && !done ? (
+          // An example of the photo wanted, so people can picture it before uploading
+          <>
+            {busy ? <Spinner /> : <img src={placeholderImage} alt="Example of the photo to upload" className="h-[55%] w-auto max-w-full object-contain" />}
+            <span className="text-caption font-bold">Click to upload</span>
+            <span className="text-caption text-subtle">JPG, PNG or WEBP · Max {MAX_IMAGE_SIZE_MB} MB</span>
+          </>
+        ) : (
+          <>
+            <span className="flex size-10 items-center justify-center rounded-full border bg-card text-primary">{busy ? <Spinner /> : <ArrowDownToLineIcon className="size-5" />}</span>
+            <span className="text-caption font-bold">{done ? 'Couldn’t load the photo' : 'Click to upload'}</span>
+            <span className="text-caption text-subtle">JPG, PNG or WEBP · Max {MAX_IMAGE_SIZE_MB} MB</span>
+          </>
+        )}
+        {showImage && !locked && (
+          <span className="absolute inset-x-2 bottom-2 flex items-center justify-center gap-1.5 rounded-md bg-background/90 py-1 text-caption font-semibold text-primary shadow-sm backdrop-blur">
+            {busy ? <Spinner className="size-3.5" /> : null}
+            Click to replace
+          </span>
+        )}
+        <input
+          id={inputId}
+          type="file"
+          accept={ACCEPTED_IMAGE_TYPES.join(',')}
+          className="sr-only"
+          disabled={locked || busy}
+          onChange={(e) => {
+            const file = e.target.files?.[0]
+            e.target.value = ''
+            if (file) onPick(file)
+          }}
+        />
+      </label>
+    </div>
+  )
+}
+
+/**
+ * The 3 photos an account needs. While any is missing, the missing one can be uploaded and the others replaced;
+ * once all 3 are submitted they are locked.
+ */
+function IdentityPhotos({ photos, onChanged }) {
+  const [busy, setBusy] = useState(null)
+  const [version, setVersion] = useState(() => Date.now())
+  const tiles = [
+    ['front', 'Document front'],
+    ['back', 'Document back'],
+    ['selfie', 'Photo of you holding your document'],
+  ]
+
+  const upload = async (side, file) => {
+    const message = validateImageFile(file)
+    if (message) return toast.error(message)
+    setBusy(side)
+    try {
+      const { photos: next } = await uploadIdentityPhoto(side, file)
+      setVersion(Date.now())
+      toast.success(next.complete ? 'All 3 photos submitted — they are now locked' : 'Photo saved')
+      onChanged()
+    } catch (err) {
+      toast.error(err.details?.photo ?? err.message)
+    } finally {
+      setBusy(null)
+    }
+  }
+
+  return (
+    <div className="mt-[18.75px] rounded-xl border p-[18.75px]">
+      <p className="flex flex-wrap items-center gap-2 text-title font-bold">
+        Identity photos
+        <StatusBadge tone={photos.complete ? 'success' : 'warning'} icon={false} className="h-6">
+          {photos.complete ? 'All 3 submitted' : 'Photo missing'}
+        </StatusBadge>
+      </p>
+      <p className="pt-1 text-caption text-muted-foreground">
+        {photos.locked
+          ? 'All 3 photos are submitted and locked. They can’t be changed here — contact support if something is wrong.'
+          : 'Your account can’t be approved until all 3 photos are submitted. Until then you can add the missing photo and replace the others. Once all 3 are in, they are locked.'}
+      </p>
+      <div className="mt-4 grid gap-5 sm:grid-cols-3 sm:gap-6">
+        {tiles.map(([side, label]) => (
+          <PhotoTile key={side} side={side} label={label} done={photos[side]} locked={photos.locked} version={version} busy={busy === side} onPick={(file) => upload(side, file)} placeholderImage={PHOTO_EXAMPLES[side]} />
+        ))}
+      </div>
+      {!photos.selfie && <SelfieSample showImage={false} className="mt-4 max-w-sm" />}
+    </div>
+  )
+}
+
+function IdentityTab({ account, onAddFace, startingFace, onChanged }) {
   const { identity, profile } = account
   const kyc = KYC_STATUS[profile.status]
   // Hidden if the photo can't be loaded (e.g. the face scan host is unreachable)
@@ -144,6 +257,8 @@ function IdentityTab({ account, onAddFace, startingFace }) {
         <Cell label="Submitted">{formatDate(identity.submittedAt)}</Cell>
         <Cell label="Reviewed">{identity.reviewedAt ? formatDate(identity.reviewedAt) : 'Not reviewed yet'}</Cell>
       </dl>
+
+      <IdentityPhotos photos={identity.photos} onChanged={onChanged} />
 
       <div className="mt-[18.75px] rounded-xl border p-[18.75px]">
         <div className="flex flex-wrap items-center gap-4">
@@ -421,7 +536,7 @@ export default function AccountPage() {
 
           <Panel className="p-[25px]">
             {tab === 'profile' && <ProfileTab account={account} onEdit={() => setDialog('contact')} />}
-            {tab === 'identity' && <IdentityTab account={account} onAddFace={beginFaceScan} startingFace={startingFace} />}
+            {tab === 'identity' && <IdentityTab account={account} onAddFace={beginFaceScan} startingFace={startingFace} onChanged={reload} />}
             {tab === 'security' && <SecurityTab account={account} onChangePassword={() => setDialog('password')} onToggleTwoFactor={() => setDialog('twofa')} />}
             {tab === 'sessions' && <SessionsTab />}
           </Panel>

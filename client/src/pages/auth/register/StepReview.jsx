@@ -78,7 +78,7 @@ export default function StepReview({ data, onEdit, onBack, onSubmit, submitting 
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
           <Thumb file={identity.front} label="Document front" />
           <Thumb file={identity.back} label="Document back" />
-          {identity.supporting && <Thumb file={identity.supporting} label="Supporting certificate" />}
+          {identity.supporting && <Thumb file={identity.supporting} label="Photo holding document" />}
         </div>
       </Section>
 

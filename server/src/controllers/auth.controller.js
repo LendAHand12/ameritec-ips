@@ -29,7 +29,8 @@ async function assertAccountInfoAvailable({ email, phoneCountry, phoneNumber, re
 
   if (emailTaken) details.email = 'Email is already registered'
   if (phoneTaken) details.phoneNumber = 'Phone number is already registered'
-  if (referralCode && !referrer) details.referralCode = 'Referral code does not exist'
+  if (!referralCode) details.referralCode = 'Referral code is required'
+  else if (!referrer) details.referralCode = 'Referral code does not exist'
 
   if (Object.keys(details).length) {
     throw new ApiError(409, Object.values(details)[0], details, 'ACCOUNT_INFO_INVALID')
@@ -89,10 +90,11 @@ export async function register(req, res) {
   const front = req.files?.documentFront?.[0]
   const back = req.files?.documentBack?.[0]
   const supporting = req.files?.supportingDocument?.[0]
-  if (!front || !back) {
+  if (!front || !back || !supporting) {
     const details = {}
     if (!front) details.documentFront = 'Front image is required'
     if (!back) details.documentBack = 'Back image is required'
+    if (!supporting) details.supportingDocument = 'A photo of you holding your document is required'
     throw new ApiError(400, Object.values(details)[0], details, 'VALIDATION_ERROR')
   }
 

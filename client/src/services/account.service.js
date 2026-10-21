@@ -7,6 +7,13 @@ export const changePassword = (data) => api.post('/account/password', data)
 export const setupTwoFactor = (password) => api.post('/account/2fa/setup', { password })
 export const enableTwoFactor = (setupToken, code) => api.post('/account/2fa/enable', { setupToken, code })
 export const disableTwoFactor = (password, code) => api.post('/account/2fa/disable', { password, code })
+// side: 'front' | 'back' | 'selfie' (the person holding the document)
+export const uploadIdentityPhoto = (side, file) => {
+  const form = new FormData()
+  form.append('photo', file)
+  return api.post(`/account/identity-photo/${side}`, form)
+}
+export const identityImageUrl = (side, version = 0) => `${import.meta.env.VITE_API_URL ?? ''}/api/account/identity-image/${side}?v=${version}`
 export const signOutOtherSessions = () => api.post('/account/sessions/revoke-others')
 
 /** The signed-in user's own face scan photo (served through our API). */

@@ -27,4 +27,13 @@ export const updateAdminSchema = z.object({
   isActive: z.boolean(),
 })
 
+export const sendNotificationSchema = z
+  .object({
+    audience: z.enum(['all', 'user'], { error: 'Choose who receives it' }),
+    userId: z.string().regex(/^[0-9a-f]{24}$/i, 'Choose a user').optional(),
+    title: z.string().trim().min(3, 'Enter a title (3+ characters)').max(100),
+    message: z.string().trim().min(1, 'Enter the message').max(2000),
+  })
+  .refine((d) => d.audience === 'all' || d.userId, { path: ['userId'], message: 'Choose a user' })
+
 export const resetAdminPasswordSchema = z.object({ password: passwordSchema })

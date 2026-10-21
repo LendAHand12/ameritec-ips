@@ -9,6 +9,7 @@ export const PERMISSION_MODULES = [
   { key: 'parameters', label: 'Operational Parameters', description: 'Prices, allocation, commissions, payment methods' },
   { key: 'support', label: 'Support', description: 'Tickets and the help article catalog' },
   { key: 'audit', label: 'Audit Logs', description: 'Admin activity history and exports' },
+  { key: 'notifications', label: 'Notifications', description: 'Sent messages (view); send messages to users (manage)' },
 ]
 
 export const PERMISSION_LEVELS = ['view', 'manage']

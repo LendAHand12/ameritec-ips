@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { ExternalLinkIcon, LockIcon, PlusIcon, ScanFaceIcon, LockOpenIcon, MailCheckIcon, MailWarningIcon, PencilIcon, Trash2Icon } from 'lucide-react'
+import { AlertTriangleIcon, ExternalLinkIcon, LockIcon, PlusIcon, ScanFaceIcon, LockOpenIcon, MailCheckIcon, MailWarningIcon, PencilIcon, Trash2Icon } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
@@ -98,6 +98,7 @@ export default function UserReviewDialog({ userId, onClose, onChanged }) {
   const locked = user?.accountStatus === 'locked'
   const deleted = !!user?.deletedAt
   const canBuy = can('orders:manage') && !deleted && user?.status === 'approved'
+  const photosComplete = !!(user?.identity?.frontImage && user?.identity?.backImage && user?.identity?.supportingImage)
 
   /** Reload the profile (holdings and wallet) after something that changes them. */
   const reloadUser = () =>
@@ -358,8 +359,17 @@ export default function UserReviewDialog({ userId, onClose, onChanged }) {
               <div className="grid gap-3 sm:grid-cols-3">
                 {user.identity?.frontImage && <DocImage userId={user._id} side="front" label="Front" />}
                 {user.identity?.backImage && <DocImage userId={user._id} side="back" label="Back" />}
-                {user.identity?.supportingImage && <DocImage userId={user._id} side="supporting" label="Supporting certificate" />}
+                {user.identity?.supportingImage && <DocImage userId={user._id} side="supporting" label="Holding the document" />}
               </div>
+              {!photosComplete && (
+                <p className="mt-3 flex items-start gap-2 rounded-lg bg-warning-soft px-3 py-2.5 text-caption text-[#75521d]">
+                  <AlertTriangleIcon className="mt-px size-4 shrink-0 text-warning" />
+                  <span>
+                    <span className="font-bold">All 3 photos are needed before this account can be approved</span> — document front, document back, and a photo of the user holding the document. Missing:{' '}
+                    {[!user.identity?.frontImage && 'front', !user.identity?.backImage && 'back', !user.identity?.supportingImage && 'photo holding the document'].filter(Boolean).join(', ')}. The user has been asked to add it in Account &amp; Security.
+                  </span>
+                </p>
+              )}
             </section>
 
             {(user.face?.status ?? 'none') !== 'none' && (
@@ -404,7 +414,7 @@ export default function UserReviewDialog({ userId, onClose, onChanged }) {
                     </div>
                     {canManage && !deleted && user.face.status === 'pending' && (
                       <div className="flex flex-wrap gap-2">
-                        <Button size="sm" disabled={!!busy} onClick={() => run('faceApprove', () => adminService.approveFace(user._id), 'Face scan approved')}>
+                        <Button size="sm" disabled={!!busy || !photosComplete} title={photosComplete ? undefined : 'All 3 identity photos are required first'} onClick={() => run('faceApprove', () => adminService.approveFace(user._id), 'Face scan approved')}>
                           {busy === 'faceApprove' && <Spinner />}
                           Approve face scan
                         </Button>
@@ -478,7 +488,8 @@ export default function UserReviewDialog({ userId, onClose, onChanged }) {
                     {user.status !== 'approved' && user.emailVerified && (
                       <Button
                         className="flex-1"
-                        disabled={!!busy}
+                        disabled={!!busy || !photosComplete}
+                        title={photosComplete ? undefined : 'All 3 identity photos are required first'}
                         onClick={() => run('approve', () => adminService.approveUser(user._id), 'Application approved')}
                       >
                         {busy === 'approve' && <Spinner />}

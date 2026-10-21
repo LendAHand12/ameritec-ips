@@ -34,7 +34,7 @@ export const accountInfoSchema = z
     email: emailSchema,
     phoneCountry: z.string().min(1, 'Select a country code'),
     phoneNumber: z.string().trim().min(1, 'Phone number is required'),
-    referralCode: z.string().optional().transform((v) => normalizeReferralCode(v)),
+    referralCode: z.string().transform((v) => normalizeReferralCode(v)).pipe(z.string().min(1, 'Referral code is required')),
     password: passwordSchema,
     confirmPassword: z.string().min(1, 'Please confirm your password'),
     acceptTerms: z.literal(true, { error: 'Please accept the Terms of Service and Privacy Policy' }),

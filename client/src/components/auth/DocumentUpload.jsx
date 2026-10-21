@@ -18,7 +18,7 @@ export function validateImageFile(file) {
  * Labelled upload box with preview. Calls onChange(file | null) or onError(message).
  * On phones the file picker also offers the camera.
  */
-export default function DocumentUpload({ label, uploadLabel = `Upload ${label}`, required = false, file, onChange, onError, error, className }) {
+export default function DocumentUpload({ label, uploadLabel = `Upload ${label}`, required = false, file, onChange, onError, error, className, placeholderImage }) {
   const id = useId()
   const previewUrl = useObjectUrl(file)
 
@@ -51,6 +51,14 @@ export default function DocumentUpload({ label, uploadLabel = `Upload ${label}`,
         >
           {previewUrl ? (
             <img src={previewUrl} alt={`${label} preview`} className="size-full object-contain" />
+          ) : placeholderImage ? (
+            // An example of the photo wanted, so people can picture it before uploading
+            <>
+              <img src={placeholderImage} alt="Example of the photo to upload" className="mb-1 h-[110px] w-auto max-w-full object-contain" />
+              <span className="text-caption font-bold">{uploadLabel}</span>
+              <span className="text-caption font-semibold text-primary">Use camera or browse files</span>
+              <span className="text-caption text-subtle">JPG, PNG or WEBP · Max {MAX_IMAGE_SIZE_MB} MB</span>
+            </>
           ) : (
             <>
               <span className="mb-[2.5px] flex size-10 items-center justify-center rounded-full border bg-card text-primary">

@@ -1,3 +1,4 @@
+import { useCallback, useEffect, useState } from 'react'
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { BellIcon, ChevronDownIcon, LogOutIcon, ShieldCheckIcon, WalletIcon } from 'lucide-react'
 import {
@@ -13,9 +14,10 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import Logo from '@/components/brand/Logo'
 import { useAsync } from '@/hooks/useAsync'
 import { useAuth } from '@/hooks/useAuth'
-import { formatUsdt } from '@/lib/format'
+import { formatDateTime24, formatUsdt } from '@/lib/format'
 import { LEGAL_LINKS } from '@/lib/legal'
 import { cn } from '@/lib/utils'
+import { listNotifications, markNotificationsRead } from '@/services/notification.service'
 import { getTradeConfig } from '@/services/trade.service'
 
 const USER_NAV = [
@@ -73,9 +75,30 @@ function BalancePill({ amount }) {
   )
 }
 
-function NotificationsButton({ unread = 0 }) {
+function NotificationsButton() {
+  const [state, setState] = useState({ items: [], unread: 0 })
+  const [open, setOpen] = useState(false)
+
+  const load = useCallback(() => listNotifications().then((r) => setState({ items: r.data, unread: r.unread })).catch(() => {}), [])
+  // Check on load and once a minute, so a new announcement shows up without refreshing
+  useEffect(() => {
+    load()
+    const timer = setInterval(load, 60_000)
+    return () => clearInterval(timer)
+  }, [load])
+
+  const markRead = async (payload) => {
+    await markNotificationsRead(payload).catch(() => {})
+    load()
+  }
+  const toggle = (next) => {
+    setOpen(next)
+    if (next) load()
+  }
+  const { items, unread } = state
+
   return (
-    <Popover>
+    <Popover open={open} onOpenChange={toggle}>
       <PopoverTrigger
         className="relative flex size-10 items-center justify-center rounded-lg bg-card sm:size-[50px] transition-colors outline-none hover:bg-muted focus-visible:ring-3 focus-visible:ring-ring/30"
         aria-label={unread ? `Notifications, ${unread} unread` : 'Notifications'}
@@ -83,9 +106,39 @@ function NotificationsButton({ unread = 0 }) {
         <BellIcon className="size-[25px]" />
         {unread > 0 && <span className="absolute top-[8.75px] left-[31.25px] size-[8.75px] rounded-full bg-primary" aria-hidden />}
       </PopoverTrigger>
-      <PopoverContent align="end" className="w-72">
-        <p className="text-title font-bold">Notifications</p>
-        <p className="text-caption text-muted-foreground">Notifications are coming soon.</p>
+      <PopoverContent align="end" className="w-[340px] p-0">
+        <div className="flex items-center justify-between gap-2 border-b px-4 py-3">
+          <p className="text-title font-bold">Notifications</p>
+          {unread > 0 && (
+            <button type="button" onClick={() => markRead({ all: true })} className="text-caption font-semibold text-primary hover:underline">
+              Mark all as read
+            </button>
+          )}
+        </div>
+        {items.length === 0 ? (
+          <p className="px-4 py-8 text-center text-caption text-muted-foreground">You’re all caught up.</p>
+        ) : (
+          <ul className="max-h-[380px] divide-y overflow-y-auto">
+            {items.map((n) => (
+              <li key={n.id}>
+                <button
+                  type="button"
+                  onClick={() => !n.read && markRead({ ids: [n.id] })}
+                  className={cn('block w-full px-4 py-3 text-left transition-colors hover:bg-muted', !n.read && 'bg-primary-soft/40')}
+                >
+                  <span className="flex items-start gap-2">
+                    {!n.read && <span className="mt-1.5 size-2 shrink-0 rounded-full bg-primary" aria-label="Unread" />}
+                    <span className="min-w-0 flex-1">
+                      <span className="block text-sm font-bold">{n.title}</span>
+                      <span className="block whitespace-pre-line text-caption text-muted-foreground">{n.message}</span>
+                      <span className="block pt-1 text-caption text-subtle">{formatDateTime24(n.createdAt)}</span>
+                    </span>
+                  </span>
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
       </PopoverContent>
     </Popover>
   )

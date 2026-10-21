@@ -4,6 +4,7 @@ import {
   ArrowRightIcon,
   ArrowRightLeftIcon,
   BellIcon,
+  MegaphoneIcon,
   BookOpenIcon,
   ChevronDownIcon,
   LayoutGridIcon,
@@ -38,6 +39,7 @@ const ADMIN_NAV = [
   { to: '/admin/referrals', label: 'Referral & Commission', icon: UsersIcon, perm: 'referrals:view' },
   { to: '/admin/parameters', label: 'Operational Parameters', icon: SlidersHorizontalIcon, perm: 'parameters:view' },
   { to: '/admin/support', label: 'Support', icon: LifeBuoyIcon, badge: 'supportPending', perm: 'support:view' },
+  { to: '/admin/notifications', label: 'Notifications', icon: MegaphoneIcon, perm: 'notifications:view' },
   { to: '/admin/audit-logs', label: 'Audit Logs', icon: BookOpenIcon, perm: 'audit:view' },
   { to: '/admin/settings', label: 'Settings', icon: SettingsIcon, perm: 'admins:manage' },
 ]

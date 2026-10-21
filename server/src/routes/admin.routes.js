@@ -6,6 +6,7 @@ import * as adminReferrals from '../controllers/adminReferrals.controller.js'
 import * as adminOverview from '../controllers/adminOverview.controller.js'
 import * as adminAdmins from '../controllers/adminAdmins.controller.js'
 import * as adminRoles from '../controllers/adminRoles.controller.js'
+import * as adminNotifications from '../controllers/adminNotification.controller.js'
 import * as adminTrade from '../controllers/adminTrade.controller.js'
 import * as adminSupport from '../controllers/adminSupport.controller.js'
 import * as auditLog from '../controllers/auditLog.controller.js'
@@ -24,7 +25,7 @@ import {
   listArticlesQuerySchema,
   updateTicketSchema,
 } from '../validators/support.validator.js'
-import { createAdminSchema, resetAdminPasswordSchema, roleSchema, updateAdminSchema } from '../validators/adminAccounts.validator.js'
+import { createAdminSchema, resetAdminPasswordSchema, roleSchema, sendNotificationSchema, updateAdminSchema } from '../validators/adminAccounts.validator.js'
 import { listAdminOrdersQuerySchema, manualOrderSchema, rejectOrderSchema, updateSettingsSchema } from '../validators/adminTrade.validator.js'
 import {
   adminLoginSchema,
@@ -70,6 +71,9 @@ router.post('/me/2fa/disable', otpLimiter, act('admin.2fa_disable'), validate(ad
 
 // Admin accounts & permissions (super admin only)
 router.get('/admins/meta', requireSuperAdmin, adminAdmins.getMeta)
+router.get('/notifications', requirePermission('notifications:view'), adminNotifications.listSentNotifications)
+router.get('/notifications/recipients', requirePermission('notifications:manage'), adminNotifications.searchRecipients)
+router.post('/notifications', requirePermission('notifications:manage'), act('notification.send'), validate(sendNotificationSchema), adminNotifications.sendNotification)
 router.get('/admins/roles', requireSuperAdmin, adminRoles.listRoles)
 router.post('/admins/roles', requireSuperAdmin, act('admin.role_create'), validate(roleSchema), adminRoles.createRole)
 router.patch('/admins/roles/:id', requireSuperAdmin, act('admin.role_update'), validate(roleSchema), adminRoles.updateRole)

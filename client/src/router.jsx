@@ -34,6 +34,7 @@ import AdminUsersPage from '@/pages/admin/AdminUsersPage'
 import AdminTransactionsPage from '@/pages/admin/AdminTransactionsPage'
 import AdminParametersPage from '@/pages/admin/AdminParametersPage'
 import AdminSupportPage from '@/pages/admin/AdminSupportPage'
+import AdminNotificationsPage from '@/pages/admin/AdminNotificationsPage'
 import AdminSupportTicketPage from '@/pages/admin/AdminSupportTicketPage'
 import AdminAuditLogsPage from '@/pages/admin/AdminAuditLogsPage'
 
@@ -122,6 +123,10 @@ const router = createBrowserRouter([
                       { path: 'support', element: <AdminSupportPage />, handle: { title: 'Support' } },
                       { path: 'support/tickets/:id', element: <AdminSupportTicketPage />, handle: { title: 'Support' } },
                     ],
+                  },
+                  {
+                    element: <AdminPermissionRoute permission="notifications:view" />,
+                    children: [{ path: 'notifications', element: <AdminNotificationsPage />, handle: { title: 'Notifications' } }],
                   },
                   {
                     element: <AdminPermissionRoute permission="audit:view" />,

@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { CheckIcon, ShieldCheckIcon } from 'lucide-react'
 import DocumentUpload from '@/components/auth/DocumentUpload'
+import SelfieSample, { SELFIE_SAMPLE_SRC } from '@/components/auth/SelfieSample'
 import { cn } from '@/lib/utils'
 import { DOCUMENT_TYPES } from './constants'
 import StepActions from './StepActions'
@@ -59,6 +60,7 @@ export default function StepIdentity({ value, serverErrors, onBack, onNext }) {
     const next = {}
     if (!identity.front) next.front = 'Please upload the front of your document'
     if (!identity.back) next.back = 'Please upload the back of your document'
+    if (!identity.supporting) next.supporting = 'Please upload a photo of yourself holding your document'
     setErrors(next)
     if (!Object.keys(next).length) onNext(identity)
   }
@@ -85,16 +87,18 @@ export default function StepIdentity({ value, serverErrors, onBack, onNext }) {
           // Different document → previous photos no longer apply
           onChange={(documentType) => {
             if (documentType === identity.documentType) return
-            setIdentity((prev) => ({ ...prev, documentType, front: null, back: null }))
+            setIdentity((prev) => ({ ...prev, documentType, front: null, back: null, supporting: null }))
             setErrors({})
           }}
         />
       </div>
 
-      <div className="grid gap-[15px] pt-5 md:grid-cols-2">
+      {/* The three photos side by side, each with an example of what to upload */}
+      <div className="grid gap-6 pt-5 md:grid-cols-3 md:gap-8">
         <DocumentUpload
           label="Document Front"
           required
+          placeholderImage="/kyc-sample-front.svg"
           file={identity.front}
           error={errors.front}
           onChange={(file) => setFile('front', file)}
@@ -103,10 +107,21 @@ export default function StepIdentity({ value, serverErrors, onBack, onNext }) {
         <DocumentUpload
           label="Document Back"
           required
+          placeholderImage="/kyc-sample-back.svg"
           file={identity.back}
           error={errors.back}
           onChange={(file) => setFile('back', file)}
           onError={setFileError('back')}
+        />
+        <DocumentUpload
+          label="You Holding Your Document"
+          uploadLabel="Upload your photo with the document"
+          required
+          placeholderImage={SELFIE_SAMPLE_SRC}
+          file={identity.supporting}
+          error={errors.supporting}
+          onChange={(file) => setFile('supporting', file)}
+          onError={setFileError('supporting')}
         />
       </div>
 
@@ -123,17 +138,10 @@ export default function StepIdentity({ value, serverErrors, onBack, onNext }) {
       </div>
 
       <div className="mt-[21.25px] border-t pt-[21.25px]">
-        <DocumentUpload
-          label="Supporting Certificate"
-          className="md:w-[calc(50%-7.5px)]"
-          file={identity.supporting}
-          error={errors.supporting}
-          onChange={(file) => setFile('supporting', file)}
-          onError={setFileError('supporting')}
-        />
-        <p className="pt-[8.75px] text-caption text-muted-foreground">
-          The required certificate depends on the current Ameritec verification requirements.
+        <p className="pb-3 text-caption text-muted-foreground">
+          All 3 photos are required: the front and back of your document, and a photo of you holding that same document. Your account can’t be approved until all 3 are submitted.
         </p>
+        <SelfieSample showImage={false} />
       </div>
 
       <StepActions onBack={() => onBack(identity)} onNext={handleNext} nextLabel="Continue to Secure Account" />

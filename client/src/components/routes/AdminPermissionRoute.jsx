@@ -9,6 +9,7 @@ export const ADMIN_AREAS = [
   ['referrals:view', '/admin/referrals'],
   ['parameters:view', '/admin/parameters'],
   ['support:view', '/admin/support'],
+  ['notifications:view', '/admin/notifications'],
   ['audit:view', '/admin/audit-logs'],
   ['admins:manage', '/admin/admins'],
 ]

@@ -42,9 +42,9 @@ export const accountInfoSchema = z
     phoneCountry: phoneCountrySchema,
     phoneNumber: phoneNumberSchema,
     referralCode: z
-      .string()
-      .optional()
-      .transform((v) => normalizeReferralCode(v) || undefined),
+      .string({ error: 'Referral code is required' })
+      .transform((v) => normalizeReferralCode(v))
+      .pipe(z.string().min(1, 'Referral code is required')),
     password: passwordSchema,
     confirmPassword: z.string({ error: 'Please confirm your password' }),
   })

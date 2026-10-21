@@ -217,9 +217,18 @@ export async function getIdentityImage(req, res) {
   res.sendFile(path.basename(filename), { root: path.resolve(env.kyc.dir) })
 }
 
+/** An account needs all 3 identity photos (front, back, and the person holding the document) before it can be approved. */
+function assertThreePhotos(user) {
+  const { frontImage, backImage, supportingImage } = user.identity ?? {}
+  if (!frontImage || !backImage || !supportingImage) {
+    throw new ApiError(409, 'All 3 photos are required before this account can be approved: document front, document back, and a photo of the user holding the document.', undefined, 'IDENTITY_PHOTOS_INCOMPLETE')
+  }
+}
+
 export async function approveUser(req, res) {
   describeAudit(req, { record: { type: 'user', id: req.params.id } })
   const user = await findUserOrThrow(req.params.id)
+  assertThreePhotos(user)
   describeAudit(req, { investor: investorOf(user), record: userRecord(user), description: `Identity verification approved for ${user.fullName}`, changes: [{ field: 'KYC status', from: user.status, to: USER_STATUS.APPROVED }] })
   if (!user.emailVerified) throw new ApiError(400, 'User has not verified their email yet')
 
@@ -378,6 +387,7 @@ export async function verifyUserEmail(req, res) {
 export async function approveFace(req, res) {
   describeAudit(req, { record: { type: 'user', id: req.params.id } })
   const user = await findUserOrThrow(req.params.id)
+  assertThreePhotos(user)
   if (user.face?.status !== FACE_STATUS.PENDING) throw new ApiError(409, 'There is no face scan waiting for review')
   describeAudit(req, {
     investor: investorOf(user),
