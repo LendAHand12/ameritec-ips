@@ -41,7 +41,8 @@ const ADMIN_NAV = [
   { to: '/admin/support', label: 'Support', icon: LifeBuoyIcon, badge: 'supportPending', perm: 'support:view' },
   { to: '/admin/notifications', label: 'Notifications', icon: MegaphoneIcon, perm: 'notifications:view' },
   { to: '/admin/audit-logs', label: 'Audit Logs', icon: BookOpenIcon, perm: 'audit:view' },
-  { to: '/admin/settings', label: 'Settings', icon: SettingsIcon, perm: 'admins:manage' },
+  // Every admin gets Settings (their own 2FA); super admins also manage admins, roles and the IP whitelist there
+  { to: '/admin/settings', label: 'Settings', icon: SettingsIcon },
 ]
 
 const ROLE_LABEL = { super_admin: 'Super admin', sub_admin: 'Sub admin' }

@@ -5,17 +5,19 @@ import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { Spinner } from '@/components/ui/spinner'
+import AdminIpWhitelistTab from '@/components/admin/AdminIpWhitelistTab'
 import AdminSecurityTab from '@/components/admin/AdminSecurityTab'
 import { AccountDialog, PasswordDialog, RoleDialog } from '@/components/admin/AdminAccountDialogs'
 import FilterSelect from '@/components/admin/FilterSelect'
 import StatusBadge from '@/components/dashboard/StatusBadge'
+import { useAdminAuth } from '@/hooks/useAdminAuth'
 import { useAsync } from '@/hooks/useAsync'
 import { ADMINISTRATOR, levelFor } from '@/lib/adminRoles'
 import { formatDateTime24, formatInt } from '@/lib/format'
 import { cn } from '@/lib/utils'
 import * as adminService from '@/services/admin.service'
 
-const TABS = ['Admin Users', 'Roles & Permissions', 'Security']
+const TABS = ['Admin Users', 'Roles & Permissions', 'Security', 'IP Whitelist']
 
 const ROLE_LABEL = { super_admin: 'Super admin', sub_admin: 'Sub admin' }
 const ROLE_OPTIONS = Object.entries(ROLE_LABEL).map(([value, label]) => ({ value, label }))
@@ -40,7 +42,7 @@ function Stat({ label, value }) {
   )
 }
 
-function AdminUsersTab({ admins, onEdit, onReset }) {
+function AdminUsersTab({ admins, onEdit, onReset, onDelete }) {
   const [search, setSearch] = useState('')
   const [role, setRole] = useState('')
   const [status, setStatus] = useState('')
@@ -125,6 +127,10 @@ function AdminUsersTab({ admins, onEdit, onReset }) {
                             <DropdownMenuItem onClick={() => onReset(a)}>
                               <KeyRoundIcon />
                               Reset password
+                            </DropdownMenuItem>
+                            <DropdownMenuItem variant="destructive" onClick={() => onDelete(a)}>
+                              <Trash2Icon />
+                              Delete admin
                             </DropdownMenuItem>
                           </DropdownMenuContent>
                         </DropdownMenu>
@@ -287,8 +293,11 @@ function RolesTab({ admins, roles, modules, onCreate, onEdit, onChanged }) {
   )
 }
 
-export default function AdminSettingsPage() {
+/** Super admin view: admins, roles, security and the IP whitelist. */
+function SuperAdminSettings() {
   const [tab, setTab] = useState(TABS[0])
+  const [deleting, setDeleting] = useState(null)
+  const [deletingBusy, setDeletingBusy] = useState(false)
   const [reloadKey, setReloadKey] = useState(0)
   const [editing, setEditing] = useState(undefined) // undefined = closed, null = new, object = edit
   const [resetting, setResetting] = useState(null)
@@ -298,6 +307,20 @@ export default function AdminSettingsPage() {
   const { data: roles } = useAsync(() => adminService.listAdminRoles().then((r) => r.data), [reloadKey])
   const modules = meta?.modules ?? []
   const reload = () => setReloadKey((k) => k + 1)
+
+  const confirmDelete = async () => {
+    setDeletingBusy(true)
+    try {
+      await adminService.deleteAdminAccount(deleting.id)
+      toast.success(`${deleting.fullName} was deleted`)
+      setDeleting(null)
+      reload()
+    } catch (err) {
+      toast.error(err.message)
+    } finally {
+      setDeletingBusy(false)
+    }
+  }
 
   return (
     <>
@@ -330,9 +353,10 @@ export default function AdminSettingsPage() {
         ))}
       </div>
 
-      {tab === 'Admin Users' && <AdminUsersTab admins={admins} onEdit={setEditing} onReset={setResetting} />}
+      {tab === 'Admin Users' && <AdminUsersTab admins={admins} onEdit={setEditing} onReset={setResetting} onDelete={setDeleting} />}
       {tab === 'Roles & Permissions' && <RolesTab admins={admins} roles={roles} modules={modules} onCreate={() => setEditingRole(null)} onEdit={setEditingRole} onChanged={reload} />}
       {tab === 'Security' && <AdminSecurityTab />}
+      {tab === 'IP Whitelist' && <AdminIpWhitelistTab />}
 
       <AccountDialog
         open={editing !== undefined}
@@ -346,6 +370,25 @@ export default function AdminSettingsPage() {
         }}
       />
       <PasswordDialog admin={resetting} onClose={() => setResetting(null)} />
+      <Dialog open={!!deleting} onOpenChange={(o) => !o && !deletingBusy && setDeleting(null)}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-subheading font-bold">Delete admin</DialogTitle>
+            <DialogDescription>
+              Delete {deleting?.fullName} ({deleting?.email})? They are signed out and can’t sign in again. What they did stays in the audit log. This can’t be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDeleting(null)} disabled={deletingBusy}>
+              Cancel
+            </Button>
+            <Button variant="destructive" onClick={confirmDelete} disabled={deletingBusy}>
+              {deletingBusy && <Spinner />}
+              Delete admin
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
       <RoleDialog
         open={editingRole !== undefined}
         role={editingRole ?? null}
@@ -356,6 +399,26 @@ export default function AdminSettingsPage() {
           reload()
         }}
       />
+    </>
+  )
+}
+
+/** Every admin: their own two-factor sign-in. Admins, roles and the IP whitelist are for super admins only. */
+export default function AdminSettingsPage() {
+  const { admin } = useAdminAuth()
+  if (admin?.role === 'super_admin') return <SuperAdminSettings />
+  return (
+    <>
+      <div>
+        <h1 className="text-[26px] leading-tight font-bold tracking-[-0.01em] sm:text-heading">Settings</h1>
+        <p className="pt-[6.25px] text-caption text-muted-foreground">Manage the security of your own account.</p>
+      </div>
+      <div role="tablist" aria-label="Settings sections" className="mt-5 flex gap-[25px] overflow-x-auto border-b">
+        <button type="button" role="tab" aria-selected className="h-[56px] shrink-0 border-b-[2.5px] border-primary px-[5px] pt-2.5 pb-[15px] text-subheading font-bold whitespace-nowrap text-foreground">
+          Security
+        </button>
+      </div>
+      <AdminSecurityTab />
     </>
   )
 }

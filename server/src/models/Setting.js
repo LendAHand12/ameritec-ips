@@ -32,6 +32,14 @@ const settingSchema = new mongoose.Schema(
       first: { type: Number, default: 0, min: 0 },
       next: { type: Number, default: 0, min: 0 },
     },
+    // Admin portal access control: when on, only these addresses (or ranges) can reach it
+    adminIpWhitelist: {
+      enabled: { type: Boolean, default: false },
+      entries: {
+        type: [{ _id: false, ip: { type: String, required: true }, note: String, addedAt: { type: Date, default: Date.now } }],
+        default: [],
+      },
+    },
     // How withdrawals are paid out. 'manual': the request is created and an admin sends the USDT by hand.
     // 'auto' (automatic payout) is planned but not available yet.
     withdrawal: {

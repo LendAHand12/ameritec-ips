@@ -132,13 +132,8 @@ const router = createBrowserRouter([
                     element: <AdminPermissionRoute permission="audit:view" />,
                     children: [{ path: 'audit-logs', element: <AdminAuditLogsPage />, handle: { title: 'Audit Logs' } }],
                   },
-                  {
-                    element: <AdminPermissionRoute permission="admins:manage" />,
-                    children: [
-                      { path: 'settings', element: <AdminSettingsPage />, handle: { title: 'Settings' } },
-                      { path: 'admins', element: <Navigate to="/admin/settings" replace /> },
-                    ],
-                  },
+                  { path: 'settings', element: <AdminSettingsPage />, handle: { title: 'Settings' } },
+                  { path: 'admins', element: <Navigate to="/admin/settings" replace /> },
                 ],
               },
             ],
