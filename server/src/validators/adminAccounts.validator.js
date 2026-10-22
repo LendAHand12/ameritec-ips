@@ -36,11 +36,4 @@ export const sendNotificationSchema = z
   })
   .refine((d) => d.audience === 'all' || d.userId, { path: ['userId'], message: 'Choose a user' })
 
-export const ipWhitelistSchema = z.object({
-  enabled: z.boolean(),
-  entries: z
-    .array(z.object({ ip: z.string().trim().min(1, 'Enter an IP address').max(64), note: z.string().trim().max(100).optional() }))
-    .max(100, 'At most 100 entries'),
-})
-
 export const resetAdminPasswordSchema = z.object({ password: passwordSchema })

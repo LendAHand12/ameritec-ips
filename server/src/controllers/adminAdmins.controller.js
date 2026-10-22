@@ -3,8 +3,6 @@ import Admin from '../models/Admin.js'
 import AdminRole from '../models/AdminRole.js'
 import ApiError from '../utils/ApiError.js'
 import { describeAudit, diff, summarizeChanges } from '../services/audit.service.js'
-import { getSettings } from '../models/Setting.js'
-import { isAllowed, normalizeIp, parseEntry } from '../services/ipWhitelist.service.js'
 
 const adminRecord = (a) => ({ type: 'admin', id: a.id, ref: a.email })
 
@@ -98,50 +96,4 @@ export async function deleteAdmin(req, res) {
   await admin.deleteOne()
   describeAudit(req, { record: adminRecord(admin), description: `Deleted sub admin ${admin.fullName} (${admin.email})` })
   res.json({ data: { id: admin.id } })
-}
-
-// ---------- IP whitelist ----------
-
-const whitelistDto = (settings, currentIp) => ({
-  enabled: settings.adminIpWhitelist.enabled,
-  entries: settings.adminIpWhitelist.entries.map((e) => ({ ip: e.ip, note: e.note ?? '', addedAt: e.addedAt })),
-  currentIp: normalizeIp(currentIp),
-  currentIpAllowed: isAllowed(currentIp, settings.adminIpWhitelist.entries),
-})
-
-export async function getIpWhitelist(req, res) {
-  res.json({ data: whitelistDto(await getSettings(), req.ip) })
-}
-
-/** Replaces the list and the on/off switch. Refuses a setup that would lock the person saving it out. */
-export async function updateIpWhitelist(req, res) {
-  const { enabled } = req.body
-  const seen = new Set()
-  const entries = []
-  const errors = {}
-  req.body.entries.forEach((e, i) => {
-    const parsed = parseEntry(e.ip)
-    if (!parsed) errors[`entries.${i}.ip`] = 'Not a valid IP address or range'
-    else if (!seen.has(parsed.value)) {
-      seen.add(parsed.value)
-      entries.push({ ip: parsed.value, note: e.note || undefined, addedAt: undefined })
-    }
-  })
-  if (Object.keys(errors).length) throw new ApiError(400, 'Some IP addresses are not valid', errors)
-  if (enabled && !entries.length) throw new ApiError(400, 'Add at least one IP address before turning the whitelist on')
-  if (enabled && !isAllowed(req.ip, entries)) {
-    throw new ApiError(400, `Your current IP (${normalizeIp(req.ip)}) is not in the list. Add it first, or you would lock yourself out.`, undefined, 'WOULD_LOCK_OUT')
-  }
-
-  const settings = await getSettings()
-  const before = { Enabled: settings.adminIpWhitelist.enabled, IPs: settings.adminIpWhitelist.entries.map((e) => e.ip).join(', ') || 'None' }
-  const previous = new Map(settings.adminIpWhitelist.entries.map((e) => [e.ip, e.addedAt]))
-  settings.adminIpWhitelist.enabled = enabled
-  settings.adminIpWhitelist.entries = entries.map((e) => ({ ...e, addedAt: previous.get(e.ip) ?? new Date() }))
-  await settings.save()
-
-  const after = { Enabled: enabled, IPs: entries.map((e) => e.ip).join(', ') || 'None' }
-  const changes = diff(before, after)
-  describeAudit(req, { description: summarizeChanges(changes) || 'IP whitelist saved', changes })
-  res.json({ data: whitelistDto(settings, req.ip) })
 }

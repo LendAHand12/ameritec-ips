@@ -5,7 +5,6 @@ import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { Spinner } from '@/components/ui/spinner'
-import AdminIpWhitelistTab from '@/components/admin/AdminIpWhitelistTab'
 import AdminSecurityTab from '@/components/admin/AdminSecurityTab'
 import { AccountDialog, PasswordDialog, RoleDialog } from '@/components/admin/AdminAccountDialogs'
 import FilterSelect from '@/components/admin/FilterSelect'
@@ -17,7 +16,7 @@ import { formatDateTime24, formatInt } from '@/lib/format'
 import { cn } from '@/lib/utils'
 import * as adminService from '@/services/admin.service'
 
-const TABS = ['Admin Users', 'Roles & Permissions', 'Security', 'IP Whitelist']
+const TABS = ['Admin Users', 'Roles & Permissions', 'Security']
 
 const ROLE_LABEL = { super_admin: 'Super admin', sub_admin: 'Sub admin' }
 const ROLE_OPTIONS = Object.entries(ROLE_LABEL).map(([value, label]) => ({ value, label }))
@@ -293,7 +292,7 @@ function RolesTab({ admins, roles, modules, onCreate, onEdit, onChanged }) {
   )
 }
 
-/** Super admin view: admins, roles, security and the IP whitelist. */
+/** Super admin view: admins, roles and security. */
 function SuperAdminSettings() {
   const [tab, setTab] = useState(TABS[0])
   const [deleting, setDeleting] = useState(null)
@@ -356,7 +355,6 @@ function SuperAdminSettings() {
       {tab === 'Admin Users' && <AdminUsersTab admins={admins} onEdit={setEditing} onReset={setResetting} onDelete={setDeleting} />}
       {tab === 'Roles & Permissions' && <RolesTab admins={admins} roles={roles} modules={modules} onCreate={() => setEditingRole(null)} onEdit={setEditingRole} onChanged={reload} />}
       {tab === 'Security' && <AdminSecurityTab />}
-      {tab === 'IP Whitelist' && <AdminIpWhitelistTab />}
 
       <AccountDialog
         open={editing !== undefined}
@@ -403,7 +401,7 @@ function SuperAdminSettings() {
   )
 }
 
-/** Every admin: their own two-factor sign-in. Admins, roles and the IP whitelist are for super admins only. */
+/** Every admin: their own two-factor sign-in. Managing admins and roles is for super admins only. */
 export default function AdminSettingsPage() {
   const { admin } = useAdminAuth()
   if (admin?.role === 'super_admin') return <SuperAdminSettings />

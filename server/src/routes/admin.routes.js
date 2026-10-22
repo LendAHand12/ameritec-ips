@@ -25,8 +25,7 @@ import {
   listArticlesQuerySchema,
   updateTicketSchema,
 } from '../validators/support.validator.js'
-import { ipGuard } from '../middlewares/ipGuard.js'
-import { createAdminSchema, ipWhitelistSchema, resetAdminPasswordSchema, roleSchema, sendNotificationSchema, updateAdminSchema } from '../validators/adminAccounts.validator.js'
+import { createAdminSchema, resetAdminPasswordSchema, roleSchema, sendNotificationSchema, updateAdminSchema } from '../validators/adminAccounts.validator.js'
 import { listAdminOrdersQuerySchema, manualOrderSchema, rejectOrderSchema, updateSettingsSchema } from '../validators/adminTrade.validator.js'
 import {
   adminLoginSchema,
@@ -56,9 +55,6 @@ const router = Router()
 // Every admin request that changes something leaves an audit entry
 router.use(auditTrail)
 
-// Optional IP whitelist: when on, only listed addresses reach any admin route, sign-in included
-router.use(ipGuard)
-
 // Admin authentication (separate from customer auth)
 router.post('/auth/login', act('admin.login'), authLimiter, validate(adminLoginSchema), adminAuth.login)
 router.post('/auth/login/2fa', act('admin.login'), otpLimiter, validate(adminLoginTwoFactorSchema), adminAuth.loginTwoFactor)
@@ -78,8 +74,6 @@ router.get('/admins/meta', requireSuperAdmin, adminAdmins.getMeta)
 router.get('/notifications', requirePermission('notifications:view'), adminNotifications.listSentNotifications)
 router.get('/notifications/recipients', requirePermission('notifications:manage'), adminNotifications.searchRecipients)
 router.post('/notifications', requirePermission('notifications:manage'), act('notification.send'), validate(sendNotificationSchema), adminNotifications.sendNotification)
-router.get('/ip-whitelist', requireSuperAdmin, adminAdmins.getIpWhitelist)
-router.put('/ip-whitelist', requireSuperAdmin, act('admin.ip_whitelist_update'), validate(ipWhitelistSchema), adminAdmins.updateIpWhitelist)
 router.get('/admins/roles', requireSuperAdmin, adminRoles.listRoles)
 router.post('/admins/roles', requireSuperAdmin, act('admin.role_create'), validate(roleSchema), adminRoles.createRole)
 router.patch('/admins/roles/:id', requireSuperAdmin, act('admin.role_update'), validate(roleSchema), adminRoles.updateRole)

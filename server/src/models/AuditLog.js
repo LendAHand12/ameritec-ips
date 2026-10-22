@@ -54,7 +54,6 @@ export const AUDIT_ACTIONS = {
   'admin.2fa_enable': { category: 'security', label: 'Turned On Two-Factor' },
   'admin.2fa_disable': { category: 'security', label: 'Turned Off Two-Factor' },
   'admin.delete': { category: 'security', label: 'Deleted Admin Account' },
-  'admin.ip_whitelist_update': { category: 'security', label: 'Updated IP Whitelist' },
   'admin.role_create': { category: 'security', label: 'Created Admin Role' },
   'admin.role_update': { category: 'security', label: 'Updated Admin Role' },
   'admin.role_delete': { category: 'security', label: 'Deleted Admin Role' },
