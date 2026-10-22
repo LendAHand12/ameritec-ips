@@ -5,6 +5,7 @@ import { describeAudit, investorOf } from '../services/audit.service.js'
 import User from '../models/User.js'
 import WalletTransaction, { COMMISSION_STATUS, getBalanceCents } from '../models/WalletTransaction.js'
 import { fromCents, toCents } from '../utils/money.js'
+import { VI, sendExcel, stamp } from '../utils/excel.js'
 
 const DAY = 24 * 60 * 60 * 1000
 const TIME_ZONE = Intl.DateTimeFormat().resolvedOptions().timeZone
@@ -77,8 +78,8 @@ export async function getSummary(req, res) {
 }
 
 /** Commission ledger: who earned what, from whose purchase, and whether it is withdrawable yet. */
-export async function listCommissions(req, res) {
-  const { page, limit, status, q, range } = req.validatedQuery
+/** The commission ledger pipeline the list and its Excel export share. */
+function commissionPipeline({ status, q, range }) {
   const match = { ...COMMISSION }
   if (status) match.status = status
   if (range) match.createdAt = { $gte: new Date(Date.now() - Number(range) * DAY) }
@@ -97,6 +98,13 @@ export async function listCommissions(req, res) {
     const rx = { $regex: escapeRegex(q), $options: 'i' }
     pipeline.push({ $match: { $or: [{ 'order.orderCode': rx }, { 'earner.fullName': rx }, { 'earner.referralCode': rx }, { 'buyer.fullName': rx }, { 'buyer.referralCode': rx }] } })
   }
+
+  return pipeline
+}
+
+export async function listCommissions(req, res) {
+  const { page, limit } = req.validatedQuery
+  const pipeline = commissionPipeline(req.validatedQuery)
 
   const [result] = await WalletTransaction.aggregate([
     ...pipeline,
@@ -120,6 +128,46 @@ export async function listCommissions(req, res) {
       amount: fromCents(t.amountCents),
     })),
     pagination: { page, limit, total, totalPages: Math.ceil(total / limit) },
+  })
+}
+
+/** The commission ledger (current filters, every page) as an Excel file. */
+export async function exportCommissions(req, res) {
+  const rows = await WalletTransaction.aggregate([...commissionPipeline(req.validatedQuery), { $limit: 50_000 }])
+
+  await sendExcel(res, {
+    filename: `danh-sach-hoa-hong-${stamp()}.xlsx`,
+    sheet: 'Hoa hồng',
+    columns: [
+      { header: 'Ngày phát sinh', key: 'date', width: 18, format: 'datetime' },
+      { header: 'Trạng thái', key: 'status', width: 24 },
+      { header: 'Ngày mở khóa', key: 'releasedAt', width: 18, format: 'datetime' },
+      { header: 'Người nhận hoa hồng', key: 'earnerName', width: 26 },
+      { header: 'Mã giới thiệu người nhận', key: 'earnerCode', width: 20 },
+      { header: 'Người mua', key: 'buyerName', width: 26 },
+      { header: 'Mã giới thiệu người mua', key: 'buyerCode', width: 20 },
+      { header: 'Mã giao dịch', key: 'orderCode', width: 18 },
+      { header: 'Loại cổ phần (Class)', key: 'shareType', width: 14 },
+      { header: 'Số cổ phần', key: 'shares', width: 14, format: 'integer' },
+      { header: 'Giá trị đơn (USDT)', key: 'orderAmount', width: 18, format: 'money' },
+      { header: 'Tỷ lệ hoa hồng (%)', key: 'ratePct', width: 16, format: 'percent' },
+      { header: 'Hoa hồng (USDT)', key: 'amount', width: 16, format: 'money' },
+    ],
+    rows: rows.map((t) => ({
+      date: t.createdAt,
+      status: VI.commissionStatus[t.status ?? COMMISSION_STATUS.AVAILABLE] ?? t.status,
+      releasedAt: t.releasedAt,
+      earnerName: t.earner?.fullName,
+      earnerCode: t.earner?.referralCode,
+      buyerName: t.buyer?.fullName,
+      buyerCode: t.buyer?.referralCode,
+      orderCode: t.order.orderCode,
+      shareType: `Class ${t.order.shareType}`,
+      shares: t.order.shares,
+      orderAmount: fromCents(t.order.amountCents),
+      ratePct: t.commissionPct,
+      amount: fromCents(t.amountCents),
+    })),
   })
 }
 

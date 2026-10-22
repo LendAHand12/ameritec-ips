@@ -54,14 +54,21 @@ export const changeUserReferrer = (id, referralCode) => api.patch(`/admin/users/
 export const deleteUser = (id, reason) => api.delete(`/admin/users/${id}`, { data: { reason } })
 export const identityImageUrl = (id, side) => `${import.meta.env.VITE_API_URL ?? ''}/api/admin/users/${id}/identity/${side}`
 
-/** Downloads the CSV for the given filters (or the selected ids). */
-export async function exportUsers(params) {
-  const blob = await api.get('/admin/users/export', { params, responseType: 'blob' })
+/** Downloads an Excel file the server builds for the given filters. */
+async function downloadExcel(path, params, name) {
+  const blob = await api.get(path, { params, responseType: 'blob' })
   const url = URL.createObjectURL(blob)
-  const a = Object.assign(document.createElement('a'), { href: url, download: `users-${new Date().toISOString().slice(0, 10)}.csv` })
+  const a = Object.assign(document.createElement('a'), { href: url, download: `${name}-${new Date().toISOString().slice(0, 10)}.xlsx` })
   a.click()
   URL.revokeObjectURL(url)
 }
+
+/** The users list (or the selected ids) as an Excel file. */
+export const exportUsers = (params) => downloadExcel('/admin/users/export', params, 'danh-sach-nguoi-dung')
+/** Every transaction matching the filters, not just the current page. */
+export const exportOrders = (params) => downloadExcel('/admin/orders/export', params, 'danh-sach-giao-dich')
+/** Every commission matching the filters, not just the current page. */
+export const exportAdminCommissions = (params) => downloadExcel('/admin/referrals/commissions/export', params, 'danh-sach-hoa-hong')
 
 // Orders
 export const listAdminOrders = (params) => api.get('/admin/orders', { params })

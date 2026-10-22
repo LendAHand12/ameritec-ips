@@ -13,7 +13,7 @@ export const getCommissionChart = (range) => api.get('/referrals/commissions/cha
 export async function exportCommissions(params) {
   const blob = await api.get('/referrals/commissions/export', { params, responseType: 'blob' })
   const url = URL.createObjectURL(blob)
-  const a = Object.assign(document.createElement('a'), { href: url, download: `commissions-${new Date().toISOString().slice(0, 10)}.csv` })
+  const a = Object.assign(document.createElement('a'), { href: url, download: `hoa-hong-${new Date().toISOString().slice(0, 10)}.xlsx` })
   a.click()
   URL.revokeObjectURL(url)
 }

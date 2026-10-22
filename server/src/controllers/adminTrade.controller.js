@@ -5,6 +5,7 @@ import Order, { ORDER_STATUS } from '../models/Order.js'
 import { getSettings } from '../models/Setting.js'
 import ApiError from '../utils/ApiError.js'
 import { withLineBreaks } from '../utils/text.js'
+import { VI, sendExcel, stamp } from '../utils/excel.js'
 import { fromCents, toCents } from '../utils/money.js'
 import { roundShares } from '../utils/shares.js'
 import { completeOrder } from '../services/order.service.js'
@@ -53,8 +54,8 @@ async function findOrderOrThrow(id) {
   return order
 }
 
-export async function listOrders(req, res) {
-  const { q, status, paymentMethod, shareType, page, limit } = req.validatedQuery
+/** The filter the Transactions list and its Excel export share. */
+async function buildOrderFilter({ q, status, paymentMethod, shareType }) {
   const filter = {
     ...(status && { status }),
     ...(paymentMethod && { paymentMethod }),
@@ -65,12 +66,69 @@ export async function listOrders(req, res) {
     const users = await User.find({ $or: [{ fullName: rx }, { email: rx }, { referralCode: rx }] }).select('_id').limit(200)
     filter.$or = [{ orderCode: rx }, { txHash: rx }, { zelleReference: rx }, { user: { $in: users.map((u) => u._id) } }]
   }
+  return filter
+}
+
+export async function listOrders(req, res) {
+  const { page, limit } = req.validatedQuery
+  const filter = await buildOrderFilter(req.validatedQuery)
 
   const [items, total] = await Promise.all([
     Order.find(filter).sort({ createdAt: -1 }).skip((page - 1) * limit).limit(limit).populate('user', 'fullName email phone referralCode'),
     Order.countDocuments(filter),
   ])
   res.json({ data: items.map(toAdminOrderDto), pagination: { page, limit, total, totalPages: Math.ceil(total / limit) } })
+}
+
+/** The Transactions list (current filters, every page) as an Excel file. */
+export async function exportOrders(req, res) {
+  const filter = await buildOrderFilter(req.validatedQuery)
+  const orders = await Order.find(filter).sort({ createdAt: -1 }).limit(50_000).populate('user', 'fullName email phone referralCode')
+
+  await sendExcel(res, {
+    filename: `danh-sach-giao-dich-${stamp()}.xlsx`,
+    sheet: 'Giao dịch',
+    columns: [
+      { header: 'Mã giao dịch', key: 'orderCode', width: 18 },
+      { header: 'Ngày tạo', key: 'createdAt', width: 18, format: 'datetime' },
+      { header: 'Ngày hoàn tất', key: 'completedAt', width: 18, format: 'datetime' },
+      { header: 'Họ và tên', key: 'fullName', width: 26 },
+      { header: 'Email', key: 'email', width: 32 },
+      { header: 'Số điện thoại', key: 'phone', width: 18 },
+      { header: 'Mã giới thiệu', key: 'referralCode', width: 16 },
+      { header: 'Loại cổ phần (Class)', key: 'shareType', width: 14 },
+      { header: 'Số cổ phần', key: 'shares', width: 14, format: 'integer' },
+      { header: 'Giá (USDT/cổ phần)', key: 'price', width: 16, format: 'money' },
+      { header: 'Tổng tiền (USDT)', key: 'amount', width: 16, format: 'money' },
+      { header: 'Phương thức thanh toán', key: 'paymentMethod', width: 20 },
+      { header: 'Loại giao dịch', key: 'kind', width: 22 },
+      { header: 'Trạng thái', key: 'status', width: 18 },
+      { header: 'Mã giao dịch blockchain (tx hash)', key: 'txHash', width: 40 },
+      { header: 'Mã xác nhận Zelle', key: 'zelleReference', width: 22 },
+      { header: 'Trả hoa hồng (đơn tạo tay)', key: 'commissionPaid', width: 22 },
+      { header: 'Ghi chú nội bộ', key: 'note', width: 44 },
+    ],
+    rows: orders.map((o) => ({
+      orderCode: o.orderCode,
+      createdAt: o.createdAt,
+      completedAt: o.completedAt,
+      fullName: o.user?.fullName,
+      email: o.user?.email,
+      phone: o.user?.phone,
+      referralCode: o.user?.referralCode,
+      shareType: `Class ${o.shareType}`,
+      shares: o.shares,
+      price: fromCents(o.priceCents),
+      amount: fromCents(o.amountCents),
+      paymentMethod: o.manual?.kind === 'convert' ? '—' : (VI.paymentMethod[o.paymentMethod] ?? ''),
+      kind: !o.manual?.createdBy ? 'Người dùng tự mua' : o.manual.kind === 'convert' ? 'Quy đổi cổ phần (admin)' : 'Admin tạo tay',
+      status: VI.orderStatus[o.status] ?? o.status,
+      txHash: o.txHash,
+      zelleReference: o.zelleReference,
+      commissionPaid: o.manual?.createdBy ? VI.yesNo(o.manual.commissionPaid) : '',
+      note: withLineBreaks(o.manual?.note),
+    })),
+  })
 }
 
 export async function getOrderStats(req, res) {

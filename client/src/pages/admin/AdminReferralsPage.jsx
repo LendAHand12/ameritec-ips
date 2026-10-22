@@ -8,6 +8,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Input } from '@/components/ui/input'
 import { Spinner } from '@/components/ui/spinner'
 import { Textarea } from '@/components/ui/textarea'
+import ExportButton from '@/components/admin/ExportButton'
 import FilterSelect from '@/components/admin/FilterSelect'
 import Pagination from '@/components/admin/Pagination'
 import UserReviewDialog from '@/components/admin/UserReviewDialog'
@@ -21,7 +22,7 @@ import { KYC_STATUS } from '@/lib/adminUsers'
 import { formatInt, formatPercent, formatShortDate, formatUsdt, formatShares, formatDateTime24 } from '@/lib/format'
 import { cn } from '@/lib/utils'
 import { bscscanTxUrl } from '@/lib/orders'
-import { getReferralSummary, listReferralCommissions, listReferrers, listWithdrawals, markWithdrawalPaid, rejectWithdrawal } from '@/services/admin.service'
+import { exportAdminCommissions, getReferralSummary, listReferralCommissions, listReferrers, listWithdrawals, markWithdrawalPaid, rejectWithdrawal } from '@/services/admin.service'
 
 const PAGE_SIZE = 10
 const RANGES = [
@@ -226,6 +227,19 @@ export default function AdminReferralsPage() {
   )
   // useAsync keeps the previous result while reloading: never draw one tab's rows in the other tab's table
   const data = loaded?.tab === tab ? loaded : null
+
+  // Excel with every commission matching the current search and status, not only this page
+  const [exporting, setExporting] = useState(false)
+  const handleExport = async () => {
+    setExporting(true)
+    try {
+      await exportAdminCommissions({ ...(q && { q }), ...(status && { status }) })
+    } catch (err) {
+      toast.error(err.message ?? 'Export failed')
+    } finally {
+      setExporting(false)
+    }
+  }
   const rows = data?.data ?? []
   const pagination = data?.pagination
 
@@ -252,7 +266,10 @@ export default function AdminReferralsPage() {
           <h1 className="text-[26px] leading-tight font-bold tracking-[-0.01em] sm:text-heading">Referral &amp; Commission</h1>
           <p className="pt-[6.25px] text-title text-muted-foreground">Track referral commissions, who earns them and when they become withdrawable.</p>
         </div>
-        <SegmentedControl label="Period" options={RANGES} value={range} onChange={setRange} />
+        <div className="flex flex-wrap items-center gap-3">
+          {tab === 'commissions' && <ExportButton onClick={handleExport} loading={exporting} />}
+          <SegmentedControl label="Period" options={RANGES} value={range} onChange={setRange} />
+        </div>
       </div>
 
       {summary?.withdrawals.pendingCount > 0 && (

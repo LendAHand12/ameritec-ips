@@ -1,8 +1,10 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useOutletContext, useSearchParams } from 'react-router-dom'
 import { CheckIcon, ClockIcon, FileWarningIcon, ReceiptIcon, SearchIcon } from 'lucide-react'
+import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Spinner } from '@/components/ui/spinner'
+import ExportButton from '@/components/admin/ExportButton'
 import FilterSelect from '@/components/admin/FilterSelect'
 import OrderReviewDialog from '@/components/admin/OrderReviewDialog'
 import Pagination from '@/components/admin/Pagination'
@@ -12,7 +14,7 @@ import { useAsync } from '@/hooks/useAsync'
 import { formatInt, formatUsdt, formatShares, formatDateTime24 } from '@/lib/format'
 import { ORDER_STATUS, PAYMENT_METHOD_LABEL } from '@/lib/orders'
 import { cn } from '@/lib/utils'
-import { getOrderStats, listAdminOrders } from '@/services/admin.service'
+import { exportOrders, getOrderStats, listAdminOrders } from '@/services/admin.service'
 
 const FILTER_KEYS = ['q', 'status', 'paymentMethod', 'shareType']
 const th = 'border-y border-divider bg-muted px-2.5 py-[11.25px] text-left text-caption font-semibold whitespace-nowrap text-muted-foreground'
@@ -60,6 +62,20 @@ export default function AdminTransactionsPage() {
     [searchParams.toString(), page], // eslint-disable-line react-hooks/exhaustive-deps
   )
   const { data, loading } = useAsync(() => listAdminOrders(query), [query, reloadKey])
+
+  // Excel with every order matching the current filters, not only this page
+  const [exporting, setExporting] = useState(false)
+  const handleExport = async () => {
+    setExporting(true)
+    try {
+      const { page: _p, limit: _l, ...rest } = query
+      await exportOrders(rest)
+    } catch (err) {
+      toast.error(err.message ?? 'Export failed')
+    } finally {
+      setExporting(false)
+    }
+  }
   const { data: stats } = useAsync(() => getOrderStats().then((r) => r.data), [reloadKey])
   const orders = data?.data ?? []
   const pagination = data?.pagination
@@ -79,8 +95,13 @@ export default function AdminTransactionsPage() {
 
   return (
     <>
-      <h1 className="text-[26px] leading-tight font-bold tracking-[-0.01em] sm:text-heading">Transactions</h1>
-      <p className="pt-[6.25px] text-title text-muted-foreground">Confirm share purchases and issue certificates.</p>
+      <div className="flex flex-wrap items-end justify-between gap-4">
+        <div>
+          <h1 className="text-[26px] leading-tight font-bold tracking-[-0.01em] sm:text-heading">Transactions</h1>
+          <p className="pt-[6.25px] text-title text-muted-foreground">Confirm share purchases and issue certificates.</p>
+        </div>
+        <ExportButton onClick={handleExport} loading={exporting} />
+      </div>
 
       <div className="mt-[18.75px] grid grid-cols-2 gap-[11.25px] xl:grid-cols-4">
         {kpis.map(({ label, value, icon, onClick }) => {

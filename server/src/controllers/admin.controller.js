@@ -4,8 +4,8 @@ import Order, { ORDER_STATUS } from '../models/Order.js'
 import User, { ACCOUNT_STATUS, FACE_STATUS, USER_STATUS } from '../models/User.js'
 import ApiError from '../utils/ApiError.js'
 import { ensureApplicationId } from '../utils/applicationId.js'
-import { toCsv } from '../utils/csv.js'
 import { maskPhone } from '../utils/mask.js'
+import { VI, sendExcel, stamp } from '../utils/excel.js'
 import { sendAccountApprovedEmail, sendAccountRejectedEmail } from '../services/mail.service.js'
 import { describeAudit, investorOf } from '../services/audit.service.js'
 import { releasePendingCommissions } from '../services/commission.service.js'
@@ -117,29 +117,42 @@ export async function getUserStats(req, res) {
 export async function exportUsers(req, res) {
   const { ids, ...filters } = req.validatedQuery
   const filter = ids?.length ? { ...ALL_USERS, _id: { $in: ids } } : buildFilter(filters)
-  const users = await User.find(filter).sort({ createdAt: -1 }).limit(50_000).populate('referredBy', 'referralCode')
+  const users = await User.find(filter).sort({ createdAt: -1 }).limit(50_000).populate('referredBy', 'fullName referralCode')
 
-  const iso = (d) => (d ? new Date(d).toISOString() : '')
-  const csv = toCsv(
-    ['Application ID', 'Full name', 'Email', 'Phone', 'Referral code', 'Referred by', 'Registered', 'KYC submitted', 'Email verified', 'KYC status', 'Account status'],
-    users.map((u) => [
-      u.applicationId,
-      u.fullName,
-      u.email,
-      u.phone,
-      u.referralCode,
-      u.referredBy?.referralCode,
-      iso(u.createdAt),
-      iso(u.emailVerifiedAt),
-      u.emailVerified ? 'Yes' : 'No',
-      u.status,
-      u.accountStatus,
-    ]),
-  )
-
-  res.set('Content-Type', 'text/csv; charset=utf-8')
-  res.set('Content-Disposition', `attachment; filename="users-${new Date().toISOString().slice(0, 10)}.csv"`)
-  res.send(csv)
+  await sendExcel(res, {
+    filename: `danh-sach-nguoi-dung-${stamp()}.xlsx`,
+    sheet: 'Người dùng',
+    columns: [
+      { header: 'Mã hồ sơ', key: 'applicationId', width: 16 },
+      { header: 'Họ và tên', key: 'fullName', width: 26 },
+      { header: 'Email', key: 'email', width: 32 },
+      { header: 'Số điện thoại', key: 'phone', width: 18 },
+      { header: 'Mã giới thiệu', key: 'referralCode', width: 16 },
+      { header: 'Người giới thiệu', key: 'referrerName', width: 26 },
+      { header: 'Mã giới thiệu của người giới thiệu', key: 'referrerCode', width: 22 },
+      { header: 'Ngày đăng ký', key: 'createdAt', width: 18, format: 'datetime' },
+      { header: 'Ngày xác thực email', key: 'emailVerifiedAt', width: 18, format: 'datetime' },
+      { header: 'Email đã xác thực', key: 'emailVerified', width: 14 },
+      { header: 'Trạng thái KYC', key: 'status', width: 16 },
+      { header: 'Face scan', key: 'face', width: 14 },
+      { header: 'Trạng thái tài khoản', key: 'accountStatus', width: 18 },
+    ],
+    rows: users.map((u) => ({
+      applicationId: u.applicationId,
+      fullName: u.fullName,
+      email: u.email,
+      phone: u.phone,
+      referralCode: u.referralCode,
+      referrerName: u.referredBy?.fullName,
+      referrerCode: u.referredBy?.referralCode,
+      createdAt: u.createdAt,
+      emailVerifiedAt: u.emailVerifiedAt,
+      emailVerified: VI.yesNo(u.emailVerified),
+      status: VI.kycStatus[u.status] ?? u.status,
+      face: VI.faceStatus[u.faceVerified ? 'approved' : (u.face?.status ?? 'none')],
+      accountStatus: VI.accountStatus[u.accountStatus] ?? u.accountStatus,
+    })),
+  })
 }
 
 /** Shares the user holds (completed orders), what they paid, current value, plus the prices/rates a manual order needs. */

@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useOutletContext, useSearchParams } from 'react-router-dom'
-import { ArrowDownToLineIcon, CheckIcon, MailWarningIcon, ScanFaceIcon, SearchIcon, ShieldCheckIcon, UsersIcon, XCircleIcon } from 'lucide-react'
+import { CheckIcon, MailWarningIcon, ScanFaceIcon, SearchIcon, ShieldCheckIcon, UsersIcon, XCircleIcon } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Spinner } from '@/components/ui/spinner'
 import FilterSelect from '@/components/admin/FilterSelect'
+import ExportButton from '@/components/admin/ExportButton'
 import Pagination from '@/components/admin/Pagination'
 import UserReviewDialog from '@/components/admin/UserReviewDialog'
 import StatusBadge from '@/components/dashboard/StatusBadge'
@@ -144,10 +145,7 @@ export default function AdminUsersPage() {
             Manage investor accounts and review identity verification applications.
           </p>
         </div>
-        <Button className="h-[50px] min-w-[115px] gap-3 px-[21.25px] text-title font-bold" onClick={handleExport} disabled={exporting}>
-          {selected.size ? `Export (${selected.size})` : 'Export'}
-          {exporting ? <Spinner className="size-5" /> : <ArrowDownToLineIcon className="size-[22.5px]" />}
-        </Button>
+        <ExportButton onClick={handleExport} loading={exporting} count={selected.size} />
       </div>
 
       {/* KYC status tabs */}

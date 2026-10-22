@@ -89,6 +89,7 @@ router.get('/overview', requirePermission('overview:view'), validate(overviewQue
 // Referral & commission (read-only)
 router.post('/users/:id/balance-adjustment', requirePermission('referrals:manage'), act('wallet.adjust'), validate(adjustBalanceSchema), adminReferrals.adjustBalance)
 router.get('/referrals/summary', requirePermission('referrals:view'), validate(referralSummaryQuerySchema, 'query'), adminReferrals.getSummary)
+router.get('/referrals/commissions/export', requirePermission('referrals:view'), validate(listReferralCommissionsQuerySchema, 'query'), adminReferrals.exportCommissions)
 router.get('/referrals/commissions', requirePermission('referrals:view'), validate(listReferralCommissionsQuerySchema, 'query'), adminReferrals.listCommissions)
 router.get('/referrals/withdrawals', requirePermission('referrals:view'), validate(listWithdrawalsQuerySchema, 'query'), adminReferrals.listWithdrawals)
 router.patch('/referrals/withdrawals/:id/paid', requirePermission('referrals:manage'), act('withdrawal.paid'), validate(markWithdrawalPaidSchema), adminReferrals.markWithdrawalPaid)
@@ -115,6 +116,7 @@ router.delete('/users/:id', requirePermission('users:manage'), act('user.delete'
 export default router
 
 // Orders (share purchases)
+router.get('/orders/export', requirePermission('orders:view'), validate(listAdminOrdersQuerySchema, 'query'), adminTrade.exportOrders)
 router.get('/orders', requirePermission('orders:view'), validate(listAdminOrdersQuerySchema, 'query'), adminTrade.listOrders)
 router.get('/orders/stats', requirePermission('orders:view'), adminTrade.getOrderStats)
 router.get('/orders/:id', requirePermission('orders:view'), adminTrade.getOrder)

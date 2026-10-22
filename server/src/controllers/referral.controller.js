@@ -3,7 +3,6 @@ import Order, { ORDER_STATUS } from '../models/Order.js'
 import { getSettings } from '../models/Setting.js'
 import User, { ACCOUNT_STATUS, USER_STATUS } from '../models/User.js'
 import WalletTransaction from '../models/WalletTransaction.js'
-import { toCsv } from '../utils/csv.js'
 import { fromCents } from '../utils/money.js'
 import Withdrawal from '../models/Withdrawal.js'
 import { getWalletSummary } from '../models/WalletTransaction.js'
@@ -11,6 +10,7 @@ import { toCents } from '../utils/money.js'
 import { roundShares } from '../utils/shares.js'
 import { assertSensitiveAuth, requestWithdrawal } from '../services/withdrawal.service.js'
 import { teamSales } from '../services/network.service.js'
+import { VI, sendExcel, stamp } from '../utils/excel.js'
 
 const MAX_LEVELS = 3 // network is shown down to F3; commission is paid on F1 only
 const MAX_MEMBERS = 5000
@@ -153,13 +153,32 @@ export async function listCommissions(req, res) {
 export async function exportCommissions(req, res) {
   const { page: _p, limit: _l, ...filters } = req.validatedQuery
   const { items } = await findCommissions(req.user._id, filters)
-  const csv = toCsv(
-    ['Date', 'Member', 'Original transaction', 'Level', 'Commission rate (%)', 'Commission (USDT)', 'Shares', 'Class'],
-    items.map((c) => [c.date.toISOString(), c.member, c.orderCode, `F${c.level}`, c.ratePct, c.amount.toFixed(2), c.shares, c.shareType]),
-  )
-  res.set('Content-Type', 'text/csv; charset=utf-8')
-  res.set('Content-Disposition', `attachment; filename="commissions-${new Date().toISOString().slice(0, 10)}.csv"`)
-  res.send(csv)
+  await sendExcel(res, {
+    filename: `hoa-hong-${stamp()}.xlsx`,
+    sheet: 'Hoa hồng',
+    columns: [
+      { header: 'Ngày', key: 'date', width: 18, format: 'datetime' },
+      { header: 'Thành viên', key: 'member', width: 26 },
+      { header: 'Mã giao dịch gốc', key: 'orderCode', width: 18 },
+      { header: 'Cấp (F)', key: 'level', width: 10 },
+      { header: 'Trạng thái', key: 'status', width: 24 },
+      { header: 'Tỷ lệ hoa hồng (%)', key: 'ratePct', width: 16, format: 'percent' },
+      { header: 'Hoa hồng (USDT)', key: 'amount', width: 16, format: 'money' },
+      { header: 'Số cổ phần', key: 'shares', width: 14, format: 'integer' },
+      { header: 'Loại cổ phần (Class)', key: 'shareType', width: 14 },
+    ],
+    rows: items.map((c) => ({
+      date: c.date,
+      member: c.member,
+      orderCode: c.orderCode,
+      level: `F${c.level}`,
+      status: VI.commissionStatus[c.status] ?? c.status,
+      ratePct: c.ratePct,
+      amount: c.amount,
+      shares: c.shares,
+      shareType: `Class ${c.shareType}`,
+    })),
+  })
 }
 
 /** Daily commission totals for the performance chart, plus the previous period for comparison. */
